@@ -30,11 +30,11 @@ ros2 node list
 ros2 run <package_name> <executable_name> --ros-args --remap __node:=my_node //对节点进行重命名
 ros2 node info <node_name> //返回节点信息，没有特定节点名称则会返回大量节点相关的信息
 ```
-### Topics 话题 which the /turtlesim node
+### Topics 话题
 
 话题是ROS2当中重要的消息形式，接受者节点可以通过话题接受来自其他节点（发布者）的信息，同一节点下可能存在多个发布者和接受者。
 话题操作
-``` which the /turtlesim node
+```
 ros2 topic list //返回当前运行程序的话题信息（名称）
 ros2 topic list -t //返回当前运行程序的话题名称和类型
 ros2 topic echo <topic_name> //返回当前话题接受到的信息
@@ -50,7 +50,7 @@ ros2 topic hz <node/node_parameter> //可以查看接受者接受信息的频率
 ros2 topic bw <node/node_parameter> //可以查看接受者接受话题信息的带宽
 ```
 ### Parameters 参数
- which the /turtlesim node
+
 参数是节点内重要的数据信息，直接影响节点内的程序运行和状态。
 参数操作
 ```
