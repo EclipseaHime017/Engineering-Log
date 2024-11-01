@@ -60,11 +60,30 @@ ros2 param set <node_name> <parameter_name> <value> //透过终端对执行程�
 ros2 param dump <node_name> 查看某一节点的所有参数和参数值
 ros2 param load <node_name> <parameter_file> 从文件中读取参数并对节点参数进行修改
 ```
+### Services 服务
+
+服务是ROS2的另外一种通讯方式，通过client节点向server节点发送请求，server节点向client节点返还信息实现。  
+不同于话题，两节点可以通过订阅的模式实现持续的数据流的信息传递，服务限制信息传递仅仅发生在client节点发出请求后，server根据请求返回有限的信息。  
+服务操作
+```
+ros2 service list -t //查看服务及其类型
+ros2 service find <service_type> //查看类型对应的服务
+ros2 interface show <type_name> //类似与话题，使用interface查看服务接口，对比返回的信息可以发现，服务包含接受数据和返回数据两个部分
+ros2 service call <service_name> <service_type> "{parameter1: <data>, parameter2: <data>, ...}" //基于服务内容从外部发起请求
+```
 
 ### Actions 动作
 
-### Services 服务
-
+动作是一个可以包含多个话题和服务的信息交换形式，动作通常具有比较具体的、复杂的结构和目的。执行动作的节点包含目标、结果、反馈三个部分。
+可以基于简单的服务形式搭建复杂的动作，避免目标复杂度上升带来服务复杂度上升，增加了信息交流的可靠性，精简了结构。
+总体来看动作类似于服务，一大区别在于动作可以打断，并且提供持续的数据流反馈。
+动作操作
+```
+ros2 action list -t //查看动作及其类型
+ros2 action info <action_name> //查看动作的具体信息，包括动作内连接的节点
+ros2 interface show <action_name> //查看动作的接口
+ros2 action send_goal <action_name> <action_type> <values> //通过外部发送动作执行请求，其中<values>类似于服务外部请求，都是YAML格式
+```
 ### Subscriber
 
 ### Publisher
