@@ -30,6 +30,18 @@ ros2 node list
 ros2 run <package_name> <executable_name> --ros-args --remap __node:=my_node //对节点进行重命名
 ros2 node info <node_name> //返回节点信息，没有特定节点名称则会返回大量节点相关的信息
 ```
+#### How to create a node 如何创建节点
+
+作为整个ros中最基本的单元，节点的创建是通过继承一个Node类实现的，以python为例，可以使用
+```python
+class MyNode(node):
+```
+定义一个自己的节点类，并且可以通过方法
+```python
+MyNode.destroy_node()
+```
+显式地析构一个节点。
+
 ### Topics 话题
 
 话题是ROS2当中重要的消息形式，接受者节点可以通过话题接受来自其他节点（发布者）的信息，同一节点下可能存在多个发布者和接受者。
@@ -84,10 +96,4 @@ ros2 action info <action_name> //查看动作的具体信息，包括动作内�
 ros2 interface show <action_name> //查看动作的接口
 ros2 action send_goal <action_name> <action_type> <values> //通过外部发送动作执行请求，其中<values>类似于服务外部请求，都是YAML格式
 ```
-### Subscriber
 
-### Publisher
-
-### 
-
-### 
