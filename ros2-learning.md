@@ -32,11 +32,20 @@ ros2 node info <node_name> //返回节点信息，没有特定节点名称则会
 ```
 #### How to create a node 如何创建节点
 
-作为整个ros中最基本的单元，节点的创建是通过继承一个Node类实现的，以python为例，可以使用
+作为整个ros中最基本的单元，节点的创建是通过继承一个Node类实现的，以python为例，首先添加模块
 ```python
-class MyNode(node):
+import rclpy
+from rclpy.node import Node
 ```
-定义一个自己的节点类，并且可以通过方法
+随后可以通过
+```python
+class MyNode(Node):
+```
+定义一个自己的节点类或者直接声明一个基于标准Node的节点。运行时，首先进行初始化
+```python
+rclpy.init(args=args)
+```
+最后可以通过方法
 ```python
 MyNode.destroy_node()
 ```
