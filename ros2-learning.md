@@ -2,7 +2,8 @@
 
 >在Ubuntu22.04安装对应版本的ROS2以后，添加ROS2到环境变量  
 >主要参考：https://docs.ros.org   
->本文档主要是对ROS2学习的一个总结以及指令速查
+>本文档主要是对ROS2学习的一个总结以及指令速查  
+>零基础的教程请参考ROS2官方Tutorials
 
 ## Configuration Parts
 
@@ -40,6 +41,7 @@ from rclpy.node import Node
 随后可以通过
 ```python
 class MyNode(Node):
+    super().__init__('my_node')
 ```
 定义一个自己的节点类或者直接声明一个基于标准Node的节点。运行时，首先进行初始化
 ```python
@@ -69,6 +71,26 @@ ros2 interface show <topic_type> //可以查看具体的话题类型下的变量
 ros2 topic pub <topic_name> <msg_type> '<args>'//根据上面的信息，用户可以充当发布者可以根据话题内容发送特定的信息到节点从而改变接受者的行为
 ros2 topic hz <node/node_parameter> //可以查看接受者接受信息的频率
 ros2 topic bw <node/node_parameter> //可以查看接受者接受话题信息的带宽
+```
+#### Create a publisher/subscriber 创建一个话题发布者/接受者
+
+上面都是对于ROS2话题的一些概述，真正需要使用话题，我们至少需要一个话题的发布者（或者接受者，尚未验证仅仅有接受者的情况），这样我们才能在ROS2中使用对应的话题。
+```python
+self.publisher_ = self.create_publisher(Interface_Type, 'Topic_names', message_length) #初始化节点的时候声明
+```
+这里publisher_是一个发布者类的变量名，发布者节点创建的同时话题也会被创建，其中发布者构造函数当中有三个参数分别是
+>接口类型：常见的有std_msgs的String, geometry_msgs的Twist等  
+>话题名称：一个字符串  
+>话题长度  
+同时，后续的代码中需要对话题的发布或者更新频率进行一个限制
+```python
+self.timer = self.create_timer(time_period, self.timer_callback)
+```
+通常是使用这样一个定时器，包含一个发布周期和对应的回调函数。回调函数中当然可以执行任何想要的代码，但是需要注意到如果回调函数有一个比较大的规模使得运行时间大于了发布周期，那么发布的消息可能就无法得到一个及时的更新。最后在回调函数中进行对于消息的定义和发布。
+```python
+interface_type = Interface_Type()
+#对Interface_Type进行更新
+self.publisher_.publish(interface_type)
 ```
 ### Parameters 参数
 
