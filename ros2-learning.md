@@ -43,15 +43,23 @@ from rclpy.node import Node
 class MyNode(Node):
     super().__init__('my_node')
 ```
-定义一个自己的节点类或者直接声明一个基于标准Node的节点。运行时，首先进行初始化
+定义一个自己的节点类或者直接声明一个基于标准Node的节点。
+为了使用定义好的节点，需要在作为可执行文件的文件里定义一个主函数来作为可执行文件的主体，这个和C++的操作类似，
+在节点主函数中，首先进行初始化
 ```python
 rclpy.init(args=args)
 ```
+然后通常我们需要显示地构造一个节点，比如
+```python
+mynode = MyNode()
+```
+接着使用```rclpy.spin()```函数来启用循环，让程序反复的执行，直到被明确的停止或者打断。
 最后可以通过方法
 ```python
 MyNode.destroy_node()
+rclpy.shutdown()
 ```
-显式地析构一个节点。
+显式地析构一个节点，并释放资源。
 
 ### Topics 话题
 
@@ -76,9 +84,9 @@ ros2 topic bw <node/node_parameter> //可以查看接受者接受话题信息的
 
 上面都是对于ROS2话题的一些概述，真正需要使用话题，我们至少需要一个话题的发布者（或者接受者，尚未验证仅仅有接受者的情况），这样我们才能在ROS2中使用对应的话题。
 ```python
-self.publisher_ = self.create_publisher(Interface_Type, 'Topic_names', message_length) #初始化节点的时候声明
+self.<publisher> = self.create_publisher(Interface_Type, 'Topic_names', message_length) #初始化节点的时候声明
 ```
-这里publisher_是一个发布者类的变量名，发布者节点创建的同时话题也会被创建，其中发布者构造函数当中有三个参数分别是
+这里<publisher>是一个发布者类的变量名，发布者节点创建的同时话题也会被创建，其中发布者构造函数当中有三个参数分别是
 >接口类型：常见的有std_msgs的String, geometry_msgs的Twist等  
 >话题名称：一个字符串  
 >话题长度  
@@ -86,23 +94,18 @@ self.publisher_ = self.create_publisher(Interface_Type, 'Topic_names', message_l
 ```python
 self.timer = self.create_timer(time_period, self.timer_callback)
 ```
-通常是使用这样一个定时器，包含一个发布周期和对应的回调函数。回调函数中当然可以执行任何想要的代码，但是需要注意到如果回调函数有一个比较大的规模使得运行时间大于了发布周期，那么发布的消息可能就无法得到一个及时的更新。最后在回调函数中进行对于消息的定义和发布。
+通常是使用这样一个定时器，包含一个发布周期和对应的回调函数。通常情况下，回调函数会执行发布消息的操作，而定时器会使得回调函数周期性被触发，从而实现按照一定频率发布消息的效果；
+回调函数中当然可以执行任何想要的代码，但是需要注意到如果回调函数有一个比较大的规模使得运行时间大于了发布周期，那么发布的消息可能就无法得到一个及时的更新。
 ```python
-interface_type = Interface_Type()
-#对Interface_Type进行更新
-self.publisher_.publish(interface_type)
+interface_type = Interface_Type()   #对Interface_Type进行更新
+self.<publisher>.publish(interface_type)   #发布消息
 ```
-### Parameters 参数
+相应的，我们可以通过类似的代码创建对于话题的接受。
+```python
+self.subscription = self.create_subscription(Interface_Type,'Topic_names',<self.subscription_callback>,message_length)
+```
+我们可以注意到和创建话题发布不同的是，创建话题接受的函数要多了一个<self.subscription_callback>的回调函数；不同于话题发布需要使用定时器实现固定频率的收发，话题接受是在创建接受后就持续触发。
 
-参数是节点内重要的数据信息，直接影响节点内的程序运行和状态。
-参数操作
-```
-ros2 param list //查看当前执行程序的所有参数
-ros2 param get <node_name> <parameter_name> //查看某节点某数据的类型和值、
-ros2 param set <node_name> <parameter_name> <value> //透过终端对执行程序中的参数值进行修改
-ros2 param dump <node_name> 查看某一节点的所有参数和参数值
-ros2 param load <node_name> <parameter_file> 从文件中读取参数并对节点参数进行修改
-```
 ### Services 服务
 
 服务是ROS2的另外一种通讯方式，通过client节点向server节点发送请求，server节点向client节点返还信息实现。  
@@ -115,6 +118,8 @@ ros2 interface show <type_name> //类似与话题，使用interface查看服务�
 ros2 service call <service_name> <service_type> "{parameter1: <data>, parameter2: <data>, ...}" //基于服务内容从外部发起请求
 ```
 
+#### Create a server/client 创建一个服务端/客户端
+
 ### Actions 动作
 
 动作是一个可以包含多个话题和服务的信息交换形式，动作通常具有比较具体的、复杂的结构和目的。执行动作的节点包含目标、结果、反馈三个部分。
@@ -126,5 +131,17 @@ ros2 action list -t //查看动作及其类型
 ros2 action info <action_name> //查看动作的具体信息，包括动作内连接的节点
 ros2 interface show <action_name> //查看动作的接口
 ros2 action send_goal <action_name> <action_type> <values> //通过外部发送动作执行请求，其中<values>类似于服务外部请求，都是YAML格式
+```
+
+### Parameters 参数
+
+参数是节点内重要的数据信息，直接影响节点内的程序运行和状态。
+参数操作
+```
+ros2 param list //查看当前执行程序的所有参数
+ros2 param get <node_name> <parameter_name> //查看某节点某数据的类型和值、
+ros2 param set <node_name> <parameter_name> <value> //透过终端对执行程序中的参数值进行修改
+ros2 param dump <node_name> 查看某一节点的所有参数和参数值
+ros2 param load <node_name> <parameter_file> 从文件中读取参数并对节点参数进行修改
 ```
 
