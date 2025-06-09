@@ -15,7 +15,7 @@ class Gesturecontroller(Node):
         self.frame_count = 0
         self.process_frame_interval = 3
         self.timer = self.create_timer(0.1, self.timer_callback)
-        self.model_path = '/home/chlorine/ros2_ws/src/gesture_controller/model/gesture_recognizer.task'
+        self.model_path = '$YOUR_DIRECTORY_TO_THE_MODEL$/gesture_recognizer.task'
         self.options = mp.tasks.vision.GestureRecognizerOptions(
             base_options=mp.tasks.BaseOptions(model_asset_path=self.model_path),
             running_mode=mp.tasks.vision.RunningMode.VIDEO
