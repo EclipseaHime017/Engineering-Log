@@ -7,5 +7,5 @@ There are **Event** parts which record my daily life, while **Process** parts sh
 除此以外，本日志会记录基于事件和过程的总结性学习，具体详见文档。
 Encapsulated learning based on Event and Process will be included. 
 
-记录了部分本科期间的学习和工作
+记录了部分本科期间的学习和工作  
 Some of undergraduate works are recorded.
