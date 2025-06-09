@@ -10,9 +10,9 @@ class VocalController(Node):
         super().__init__('vocal_controller')
         self.publisher_ = self.create_publisher(Twist, '/cmd_vel', 10)
         self.timer = self.create_timer(1, self.timer_callback)
-        self.APP_ID = '116679617'
-        self.API_KEY = 'EUFfWkDgXQjcmjvDVmoMTUEM'
-        self.SECRET_KEY = 'jvbEnbGLipCERgLKr22kDLbvMDIRC7ix'
+        self.APP_ID = '$YOUR_APP_ID$'
+        self.API_KEY = '$YOUR_API_KEY$'
+        self.SECRET_KEY = '$YOUR_SECRET_KEY$'
         self.client = AipSpeech(self.APP_ID, self.API_KEY, self.SECRET_KEY)
 
     def get_text(self,wav_bytes):
