@@ -300,7 +300,51 @@ tests:                            # 测试用例配置
 ```
 
 (5)README.rst  
-类似于README.md，提供了指导性的内容。  oajfiksdjk
+类似于README.md，提供了指导性的内容。  
+
+注意：你的开发板对应的dts文件应该包括了一个led0。
+
+### 2. 工程实践：Helloworld
+（假定zephyr默认提供了你的板子对应的设备树文件，或者你有对应的设备树文件）
+任务目标：实现板子通过串口发送helloworld消息  
+在工作空间里创建一个helloworld文件夹；
+```sh
+cd ~/zephyrproject
+mkdir helloworld
+```
+随后创建prj.conf, CMakeLists.txt, sample.yaml以及包含main.c的文件夹src。
+由于默认的板级defconfig或Zephyr平台的默认配置通常会自动启用这些选项。例如，很多板子的默认配置中已经包含了串口配置（CONFIG_UART_CONSOLE=y）所以这里不需要额外配置，留空即可。  
+CMakeLists.txt当中，包含
+```cmake
+cmake_minimum_required(VERSION 3.20.0)
+find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+project(hello_world)
+target_sources(app PRIVATE src/main.c)
+```
+编译的时候编译器会自动找到对应地址下的文件编译；  
+
+在sample.yaml中，参考前面的blinky，
+```yaml
+sample:
+  description: Hello World
+    application
+  name: hello world
+common:
+  min_ram: 2               #定义最小RAM
+  min_flash: 16            #定义最小Flash
+  tags: introduction       #标签
+  integration_platforms:
+    - native_sim           #表明本地运行
+  harness: console	   #指定测试工具：console控制台
+  harness_config:
+    type: one_line	   #表明每次测试输出是一行文本
+    regex:		   #检查输出是否正确
+      - "Hello World! (.*)"
+tests:
+  sample.basic.helloworld: #定义了测试用例或测试集的名称
+    tags: introduction
+```
+完成后可以根据需求添加README后即可编译烧录运行。  
 
 ### APPENDIX for Learning I
 
