@@ -313,6 +313,15 @@ cd ~/zephyrproject
 mkdir helloworld
 ```
 随后创建prj.conf, CMakeLists.txt, sample.yaml以及包含main.c的文件夹src。
+```c
+#include <stdio.h>
+int main(void)
+{
+	printf("Hello World! %s\n", CONFIG_BOARD_TARGET);
+	return 0;
+}
+```
+CONFIG_BOARD_TARGET 的值就是在构建过程中通过 Kconfig 系统确定并生成的。  
 由于默认的板级defconfig或Zephyr平台的默认配置通常会自动启用这些选项。例如，很多板子的默认配置中已经包含了串口配置（CONFIG_UART_CONSOLE=y）所以这里不需要额外配置，留空即可。  
 CMakeLists.txt当中，包含
 ```cmake
