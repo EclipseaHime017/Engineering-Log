@@ -137,7 +137,9 @@ west zephyr-export
 >导出 Zephyr 环境变量到 shell 中，主要作用是，设置 CMake 的路径，使你可以脱离 west build，使用 cmake 单独构建 Zephyr 项目。  
 
 ## 二、Zephyr项目入门
+
 ### 1.Zephyr工程示例
+
 Zephyr工作空间的结构通常如下图所示：  
 ```
 zephyrproject/        # Zephyr工作空间
@@ -156,9 +158,11 @@ zephyrproject/        # Zephyr工作空间
 west build -b <your_board> .     # 示例: -b robomaster_board_c
 west flash                       # 烧录
 ```
-&emsp;&emsp;可以编译并烧录程序，需要注意的是，zephyr官方只提供了部分开发板设备树，这里robomaster_board_c是没有对应的设备树和配置信息的，需要自己写，这一部分后续教程应当体现。  
+&emsp;&emsp; 可以编译并烧录程序，需要注意的是，zephyr官方只提供了部分开发板设备树，这里robomaster_board_c是没有对应的设备树和配置信息的，需要自己写，这一部分后续教程应当体现。
 利用blinky程序来分析Zephyr工程的结构和必要文件。  
-(1)src文件夹:这个文件里面包含的主要是项目的源代码（.c文件），对于大型项目有头文件应该包括一个include文件夹与src并列存放相应宏声明和函数定义。  
+
+(1)src文件夹  
+&emsp;&emsp; 这个文件里面包含的主要是项目的源代码（.c文件），对于大型项目有头文件应该包括一个include文件夹与src并列存放相应宏声明和函数定义。  
 ```c
 #include <stdio.h>
 #include <zephyr/kernel.h>
@@ -221,6 +225,24 @@ int main(void)
 
 (2)CMakeLists.txt  
 
+&emsp;&emsp; 虽然Zephyr工程的构建是使用west build的，但是Zephyr的整个构建是基于CMake+west的：west 是命令行构建管理工具；CMake 是真正执行构建逻辑的系统；
+而CMakeLists.txt 就是构建指令的脚本。这个CMakeLists.txt文件是 Zephyr应用工程的构建配置文件，它的主要作用是告诉 CMake 如何build这个示例工程。
+```cmake
+cmake_minimum_required(VERSION 3.20.0)
+#指定了构建此工程所需的最低 CMake 版本为 3.20.0
+
+find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+#告诉 CMake 查找 Zephyr 项目，并且该工程必须依赖于 Zephyr。通过环境变量 ZEPHYR_BASE 提供 Zephyr 源码的路径，以便正确定位 Zephyr 的 CMake 模块和相关工具链
+
+project(blinky)
+#声明当前工程名称为 “blinky”
+
+target_sources(app PRIVATE src/main.c)
+#指定将 src/main.c 文件添加到名为 “app” 的目标中，该目标会包含应用程序的代码。这里使用 PRIVATE 关键字，表示这些源文件仅对该 target 可见
+```
+&emsp;&emsp; 在```target_sources(app PRIVATE src/main.c)```中，app 指的是 Zephyr 构建系统为当前应用程序自动创建的目标（target）。Zephyr 的 CMake 配置会在内部定义一个名为 app 的目标，用于链接和构建应用。在 CMakeLists.txt 中使用 target_sources(app PRIVATE src/main.c) 就是将应用程序的源文件添加到这个目标中，从而参与最终固件的编译和链接。  
+
+&emsp;&emsp; 值得注意的一点是在find_package中有一个$ENV{ZEPHYR_BASE}代表zephyr库地址的环境变量，事实上可能很多人发现在.bashrc下面并没有相关配置仍然可以正常编译，这大概是因为在先前工程示例中提到的.west/config里面有配置。
 
 (3)prj.conf  
 &emsp;&emsp; prj.conf 是 Zephyr 配置内核和模块功能的地方，类似 Kconfig。blinky当中仅有CONFIG_GPIO=y，表示启用 GPIO 子系统。此外，如果写
@@ -278,9 +300,7 @@ tests:                            # 测试用例配置
 ```
 
 (5)README.rst  
-
-
-
+类似于README.md，提供了指导性的内容。  
 
 ### APPENDIX for Learning I
 
