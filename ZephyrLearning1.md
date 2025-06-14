@@ -300,7 +300,7 @@ tests:                            # 测试用例配置
 ```
 
 (5)README.rst  
-类似于README.md，提供了指导性的内容。  
+类似于README.md，提供了指导性的内容。  oajfiksdjk
 
 ### APPENDIX for Learning I
 
