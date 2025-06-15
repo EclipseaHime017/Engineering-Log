@@ -188,15 +188,15 @@ k_sem_init(&my_sem, 2, 3);
 ```c
 int k_sem_take(struct k_sem *sem, k_timeout_t timeout);
 ```
->超时参数：
-K_FOREVER: 永久阻塞
-K_NO_WAIT: 不阻塞，立即返回
-K_MSEC(n): 最多等待 n 毫秒
+>超时参数：  
+K_FOREVER: 永久阻塞  
+K_NO_WAIT: 不阻塞，立即返回  
+K_MSEC(n): 最多等待 n 毫秒  
 
->返回值：
-0: 获取成功
--EAGAIN: 非阻塞获取失败
--EWOULDBLOCK: 超时未获取
+>返回值：  
+0: 获取成功  
+-EAGAIN: 非阻塞获取失败  
+-EWOULDBLOCK: 超时未获取  
 
 &emsp;&emsp;当 k_sem_take() 被调用时，如果 sem->count > 0：立即减 1，线程继续运行；如果 sem->count == 0：当前线程会被放入 sem->wait_q 队列，并挂起；
 内核调度器将不再调度此线程，直到：有其它线程/ISR 调用 k_sem_give()，释放一个信号量，唤醒它；
@@ -239,9 +239,9 @@ void led_thread(void)
     while (1) {
         k_sem_take(&led_sem, K_FOREVER); //等待控制线程给信号
 
-        gpio_pin_set_dt(&led, 1);  //点亮（拉高电平）
+        gpio_pin_set_dt(&led, 1);  //点亮
         k_msleep(200);      //点亮200ms
-        gpio_pin_set_dt(&led, 0);  //熄灭（拉低电平）
+        gpio_pin_set_dt(&led, 0);  //熄灭
     }
 }
 
@@ -259,6 +259,157 @@ void main(void)
 
 ### 2.互斥锁```k_mutex```
 
+在RTOS中，多线程之间**并发访问共享资源（如全局变量、外设等）**是常见场景。如果不加控制，多个线程同时读写会导致：
+>数据竞争（race condition）（多线程同时访问共享资源（如变量、SPI 总线））  
+状态错乱（比如两个线程都在更新某个 LED 状态）
+不可预测行为，严重时系统崩溃
+
+这时候我们就需要一种“线程之间排队访问”的机制 —— 互斥锁（mutex）。一个互斥锁（mutex）是一种同步原语，用于保证在任意时刻，最多只有一个线程可以访问某个共享资源，就像一把钥匙控制一个房间，只有持有钥匙的人可以进入。
+其他人必须等钥匙被释放，才能继续。
+| 特性      | 互斥锁 (`k_mutex`) | 信号量 (`k_sem`)      |
+| ------- | --------------- | ------------------ |
+| 控制权限    | 一次只允许一个线程进入     | 可以多个线程并发（只要计数 > 0） |
+| 用于      | 保护共享资源          | 线程间事件通信、资源配额       |
+| 拥有者限制   | 有，仅持有线程可解锁      | 无，任意线程可 give/take  |
+| 支持优先级继承 | 是             | 否                |
+| **核心目的**        | **互斥访问共享资源**      | **线程间通信 / 控制访问许可数量**      |
+| **计数值**         | 二元锁（通常只允许一个线程持有）  | 整数计数器，表示可用“许可”数量          |
+| **是否区分线程**      | 是，谁加锁必须谁解锁        | 否，线程 A give，线程 B take 也可以 |
+| **可重入（递归）**     | ❌ Zephyr 中不支持递归锁  | ✅ 可多次 take/give 配合使用      |
+| **阻塞行为**        | 没有锁就阻塞等待          | 没有许可就阻塞等待                 |
+| **适用于**         | 保护**共享资源访问**      | 控制**资源数量**或**任务协作**       |
+| **释放者是否必须是拥有者** | 是（不能由别的线程 unlock） | 否（任何线程都可以 give）           |
+
+
+互斥锁的结构体定义是
+```c
+struct k_mutex {
+	struct _k_mutex_data *base;
+};
+
+struct _k_mutex_data {
+	struct k_spinlock lock;
+	struct k_thread *owner;
+	uint32_t lock_count;
+	sys_dlist_t wait_q;
+};
+```
+| 成员           | 类型                  | 说明                   |
+| ------------ | ------------------- | -------------------- |
+| `lock`       | `struct k_spinlock` | 用于保证多核/中断安全地访问该结构    |
+| `owner`      | `struct k_thread *` | 当前拥有该互斥锁的线程指针        |
+| `lock_count` | `uint32_t`          | 当前锁嵌套计数（用于支持递归锁）     |
+| `wait_q`     | `sys_dlist_t`       | 等待队列，挂起等待该 mutex 的线程 |
+
+(1)初始化
+
+```c
+void k_mutex_init(struct k_mutex *mutex);
+```
+初始化一个互斥锁变量，在使用前必须调用一次。 
+
+(2)加锁
+```c
+int k_mutex_lock(struct k_mutex *mutex, k_timeout_t timeout);
+```
+参数说明：
+>mutex：要获取的互斥锁对象；  
+timeout：  
+--K_FOREVER: 一直阻塞等待直到获取成功；  
+--K_NO_WAIT: 立即返回；  
+--K_MSEC(x)：等待指定时间（毫秒）；  
+
+返回值：
+>0：成功获取；  
+-EBUSY：立即尝试失败；  
+-EAGAIN：超时；  
+-EINVAL：非法参数。  
+
+(3)解锁
+```c
+int k_mutex_unlock(struct k_mutex *mutex);
+```
+返回值：
+>0：成功释放；  
+-EPERM：非 owner 线程尝试释放；  
+-EINVAL：非法参数；  
+
+(4)注意事项  
+Zephyr 的 k_mutex 是 不可递归加锁（non-recursive） 的。如果一个线程对 mutex 多次 lock，会陷入死锁。死锁是指两个或多个线程在等待对方释放资源，导致彼此都无法继续执行的状态。
+死锁的典型场景：
+>线程 A 获得了 mutex A，等待 mutex B；
+线程 B 获得了 mutex B，等待 mutex A；
+相互等待，永远阻塞。
+
+Zephyr的 k_mutex 是非递归的（non-recursive），且并不自动检测死锁。若使用不当，线程会永久挂起在等待队列中，表现为程序“卡住”。
+
+我们来详细展开一个使用互斥锁保护LED操作的示例，在一个多线程系统中，如果多个线程要控制同一个外设（如GPIO控制的LED），而这些操作不是原子的（比如要先设定再等待、再设定），
+就会出现竞态条件（race condition），导致行为不一致甚至崩溃。比如线程 A 要点亮 LED（高电平），延迟一段时间后熄灭；线程 B 也要点亮 LED，但延迟时间不同。若两个线程并发访问 LED，没有同步机制，
+可能导致LED 刚被点亮就被另一个线程熄灭；
+
+```c
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/sys/printk.h>
+
+// 获取 LED 设备节点
+#define LED_NODE DT_ALIAS(led0)
+
+static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED_NODE, gpios);
+
+// 定义一个互斥锁
+static struct k_mutex led_mutex;
+
+// 线程 A：点亮 LED 1 秒
+void thread_a(void)
+{
+    while (1) {
+        k_mutex_lock(&led_mutex, K_FOREVER); // 获取锁
+
+        printk("Thread A 控制 LED\n");
+        gpio_pin_set_dt(&led, 1);  // 点亮 LED
+        k_msleep(1000);            // 持续 1 秒
+        gpio_pin_set_dt(&led, 0);  // 熄灭 LED
+
+        k_mutex_unlock(&led_mutex); // 释放锁
+        k_msleep(500);              // 等待下一轮
+    }
+}
+
+// 线程 B：点亮 LED 200ms
+void thread_b(void)
+{
+    while (1) {
+        k_mutex_lock(&led_mutex, K_FOREVER); // 获取锁
+
+        printk("Thread B 控制 LED\n");
+        gpio_pin_set_dt(&led, 1);  // 点亮 LED
+        k_msleep(200);            // 持续 200ms
+        gpio_pin_set_dt(&led, 0);  // 熄灭 LED
+
+        k_mutex_unlock(&led_mutex); // 释放锁
+        k_msleep(800);              // 等待下一轮
+    }
+}
+
+// 静态线程定义
+K_THREAD_DEFINE(tid_a, 512, thread_a, NULL, NULL, NULL, 5, 0, 0);
+K_THREAD_DEFINE(tid_b, 512, thread_b, NULL, NULL, NULL, 6, 0, 0);
+
+void main(void)
+{
+    // 初始化 LED 输出
+    if (!device_is_ready(led.port)) {
+        printk("LED device not ready\n");
+        return;
+    }
+    gpio_pin_configure_dt(&led, GPIO_OUTPUT_INACTIVE);
+
+    // 初始化互斥锁
+    k_mutex_init(&led_mutex);
+}
+```
 
 
 ### 3.消息队列```k_msgq```
