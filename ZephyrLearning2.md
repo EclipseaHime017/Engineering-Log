@@ -140,10 +140,10 @@ K_THREAD_DEFINE(led_tid, 1024, led_task, NULL, NULL, NULL, 3, 0, 0);
 | **消息队列** (Message Queue) | 线程间传递结构化数据  | 队列模型，线程安全通信          |
 
 ### 1.信号量```k_sem```
-在嵌入式多线程系统中，多个任务往往需要协调地工作，例如：等待另一个任务的结果，等待硬件事件的发生（如传感器中断），受限资源的共享使用（如串口、I2C总线），控制任务的执行节奏（如间隔启动）。
+&emsp;&emsp;在嵌入式多线程系统中，多个任务往往需要协调地工作，例如：等待另一个任务的结果，等待硬件事件的发生（如传感器中断），受限资源的共享使用（如串口、I2C总线），控制任务的执行节奏（如间隔启动）。
 信号量的目的就是为了解决这种线程间的协调与同步问题，信号量是 RTOS 中实现线程间同步与资源访问控制的核心机制，它使并发系统能够高效、可靠地运行而不会陷入冲突与混乱。  
 
-信号量的主要目的和用途在于：
+&emsp;&emsp;信号量的主要目的和用途在于：  
 （1） 线程间同步：通知某个事件已经发生  
 信号量常用于一个线程“告诉”另一个线程，“某个条件已经满足，你可以继续了”。比如：一个后台线程正在处理数据，主线程在完成采集后，通过释放信号量通知它可以开始处理。
 类似“门铃”机制：主线程按铃，子线程被唤醒执行，这种模式下的信号量通常是初值为0的二值信号量（binary semaphore）。  
@@ -159,7 +159,7 @@ K_THREAD_DEFINE(led_tid, 1024, led_task, NULL, NULL, NULL, 3, 0, 0);
 （4）限速或节拍控制  
 某些任务不应该无限制运行，而是按节奏运行（比如每秒执行一次采样），主线程可以周期性地释放信号量，子线程则在信号量处等待，每收到一个信号运行一次。这种方式比 k_sleep() 等更灵活，能应对外部事件节奏变化。  
 
-信号量的结构定义是
+&emsp;&emsp;信号量的结构定义是
 ```c
 struct k_sem {
     _wait_q_t wait_q;  // 挂起等待信号量的线程队列
@@ -167,15 +167,16 @@ struct k_sem {
     unsigned int limit; // 信号量允许累积的最大值（上限）
 };
 ```
-如果要在线程中使用信号量，Zephyr提供了一系列API：
+如果要在线程中使用信号量，Zephyr提供了一系列API：  
 （1）初始化
 ```c
 struct k_sem my_sem;
 k_sem_init(&my_sem, initial_count, limit);
 ```
 参数定义：  
-initial_count: 初始信号量计数（可为 0）  
-limit: 最大允许的计数值（防止无限增加）  
+>initial_count: 初始信号量计数（可为 0）  
+limit: 最大允许的计数值（防止无限增加）
+ 
 如果，
 ```c
 k_sem_init(&my_sem, 2, 3);
@@ -197,7 +198,7 @@ K_MSEC(n): 最多等待 n 毫秒
 -EAGAIN: 非阻塞获取失败
 -EWOULDBLOCK: 超时未获取
 
-当 k_sem_take() 被调用时，如果 sem->count > 0：立即减 1，线程继续运行；如果 sem->count == 0：当前线程会被放入 sem->wait_q 队列，并挂起；
+&emsp;&emsp;当 k_sem_take() 被调用时，如果 sem->count > 0：立即减 1，线程继续运行；如果 sem->count == 0：当前线程会被放入 sem->wait_q 队列，并挂起；
 内核调度器将不再调度此线程，直到：有其它线程/ISR 调用 k_sem_give()，释放一个信号量，唤醒它；
 或者超时（如果设置了 timeout），线程被从等待队列移除（内核会将其从 wait_q 队列中移除），该线程会恢复运行，k_sem_take() 返回 -EAGAIN（获取失败）。  
 
@@ -205,16 +206,56 @@ K_MSEC(n): 最多等待 n 毫秒
 ```c
 k_sem_give(&my_sem);
 ```
-**信号量的本质不是“谁用完了谁释放”，而是“释放资源以唤醒等待线程”**，信号量和互斥锁（mutex）不同，它不是线程占有，用完再释放的过程。
+&emsp;&emsp;**信号量的本质不是“谁用完了谁释放”，而是“释放资源以唤醒等待线程”**，信号量和互斥锁（mutex）不同，它不是线程占有，用完再释放的过程。
 信号量控制的是某个“可用资源的数量”，k_sem_give() 的行为是：增加信号量的可用“资源数量”，唤醒等待的线程（如果有的话）。
-```k_sem_give()```通常用于两类情况：  
+
+&emsp;&emsp;```k_sem_give()```通常用于两类情况：  
 **某个事件已经发生，通知等待线程继续执行**:一个线程处理完某项任务，然后 k_sem_give() 通知其他线程“你可以接着干了”, 表示“事件发生了”；  
 **某个资源被释放回池，允许其他线程获取**:例如：有2个串口，初始化信号量 count=2,每个线程 k_sem_take() 表示“我要用串口”，用完后 k_sem_give()，表示“串口归还了”,所以信号量是资源的“可用数计数器”。  
 简洁一句话总结：k_sem_give() 的作用是：“释放一个资源”或“发出一次事件信号”，不代表“谁用谁还”，而是由逻辑流程决定是否归还。
 
+&emsp;&emsp;一个信号量的应用实例是如何周期点亮LED灯，虽然仅仅是为了周期点亮一个led使用信号量有点\*\*\*\*\*\*的意味，但毕竟还是比较简单容易实操，可以基于先前的blinky例子进行修改。
+```c
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/gpio.h>
 
+#define LED_NODE DT_ALIAS(led0)
+static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED_NODE, gpios);
+static struct k_sem led_sem; //定义信号量
 
+// 控制线程：定时发信号
+void controller_thread(void)
+{
+    while (1) {
+        k_sem_give(&led_sem);  //发信号
+        k_msleep(1000); //每秒发一次
+    }
+}
 
+// LED 线程：等待信号然后点亮
+void led_thread(void)
+{
+    while (1) {
+        k_sem_take(&led_sem, K_FOREVER); //等待控制线程给信号
+
+        gpio_pin_set_dt(&led, 1);  //点亮（拉高电平）
+        k_msleep(200);      //点亮200ms
+        gpio_pin_set_dt(&led, 0);  //熄灭（拉低电平）
+    }
+}
+
+//静态线程创建
+K_THREAD_DEFINE(controller_tid, 512, controller_thread, NULL, NULL, NULL, 5, 0, 0);
+K_THREAD_DEFINE(led_tid, 512, led_thread, NULL, NULL, NULL, 6, 0, 0);
+
+//main函数中初始化LED和信号量
+void main(void)
+{
+    gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE);
+    k_sem_init(&led_sem, 0, 1);  // 初始信号量为 0，上限为 1
+}
+```
 
 ### 2.互斥锁```k_mutex```
 
