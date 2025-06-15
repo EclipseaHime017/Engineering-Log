@@ -1,6 +1,6 @@
 # ZephyrRTOS Learning II
 
-**作者：EclipseaHime**  
+**作者：EclipseaHime017**  
 **环境：Ubuntu22.04**
 
 ## 一、Zephyr线程创建与同步机制
