@@ -182,7 +182,12 @@ limit: 最大允许的计数值（防止无限增加）
 k_sem_init(&my_sem, 2, 3);
 ```
 那么这意味着：当前有 2个“token” 可供线程 take，最多允许累积到 3个 token，如果再 give 超过就无效。
-如果初始化一个信号量为k_sem_init(&my_sem, 0, 1); 这个信号量也被称为二值信号量（binary semaphore）
+如果初始化一个信号量为k_sem_init(&my_sem, 0, 1); 这个信号量也被称为二值信号量（binary semaphore）  
+
+静态创建信号量
+```c
+K_SEM_DEFINE(name, initial_count, limit)
+```
 
 （2）等待
 ```c
@@ -256,15 +261,16 @@ void main(void)
     k_sem_init(&led_sem, 0, 1);  // 初始信号量为 0，上限为 1
 }
 ```
+这段代码里使用了一些gpio的函数```gpio_pin_set_dt```和先前的```gpio_pin_toggle_dt```，这和STM32的HAL库函数里操作GPIO```HAL_GPIO_WritePin()```的类似。
 
 ### 2.互斥锁```k_mutex```
 
-在RTOS中，多线程之间**并发访问共享资源（如全局变量、外设等）**是常见场景。如果不加控制，多个线程同时读写会导致：
+&emsp;&emsp;在RTOS中，多线程之间**并发访问共享资源（如全局变量、外设等）**是常见场景。如果不加控制，多个线程同时读写会导致：
 >数据竞争（race condition）（多线程同时访问共享资源（如变量、SPI 总线））  
 状态错乱（比如两个线程都在更新某个 LED 状态）
 不可预测行为，严重时系统崩溃
 
-这时候我们就需要一种“线程之间排队访问”的机制 —— 互斥锁（mutex）。一个互斥锁（mutex）是一种同步原语，用于保证在任意时刻，最多只有一个线程可以访问某个共享资源，就像一把钥匙控制一个房间，只有持有钥匙的人可以进入。
+&emsp;&emsp;这时候我们就需要一种“线程之间排队访问”的机制 —— 互斥锁（mutex）。一个互斥锁（mutex）是一种同步原语，用于保证在任意时刻，最多只有一个线程可以访问某个共享资源，就像一把钥匙控制一个房间，只有持有钥匙的人可以进入。
 其他人必须等钥匙被释放，才能继续。
 | 特性      | 互斥锁 (`k_mutex`) | 信号量 (`k_sem`)      |
 | ------- | --------------- | ------------------ |
@@ -281,7 +287,7 @@ void main(void)
 | **释放者是否必须是拥有者** | 是（不能由别的线程 unlock） | 否（任何线程都可以 give）           |
 
 
-互斥锁的结构体定义是
+&emsp;&emsp;互斥锁的结构体定义是
 ```c
 struct k_mutex {
 	struct _k_mutex_data *base;
@@ -307,6 +313,13 @@ struct _k_mutex_data {
 void k_mutex_init(struct k_mutex *mutex);
 ```
 初始化一个互斥锁变量，在使用前必须调用一次。 
+
+静态创建互斥锁（无需手动初始化）
+```c
+K_MUTEX_DEFINE(name)
+```
+动态初始化：适用于运行时决定是否创建、或在很多实例中按需初始化。  
+静态创建：适用于全局或固定的共享资源保护场景。更简洁且减少遗漏初始化的风险。  
 
 (2)加锁
 ```c
@@ -335,15 +348,15 @@ int k_mutex_unlock(struct k_mutex *mutex);
 -EINVAL：非法参数；  
 
 (4)注意事项  
-Zephyr 的 k_mutex 是 不可递归加锁（non-recursive） 的。如果一个线程对 mutex 多次 lock，会陷入死锁。死锁是指两个或多个线程在等待对方释放资源，导致彼此都无法继续执行的状态。
+&emsp;&emsp;Zephyr 的 k_mutex 是 不可递归加锁（non-recursive） 的。如果一个线程对 mutex 多次 lock，会陷入死锁。死锁是指两个或多个线程在等待对方释放资源，导致彼此都无法继续执行的状态。
 死锁的典型场景：
 >线程 A 获得了 mutex A，等待 mutex B；
 线程 B 获得了 mutex B，等待 mutex A；
 相互等待，永远阻塞。
 
-Zephyr的 k_mutex 是非递归的（non-recursive），且并不自动检测死锁。若使用不当，线程会永久挂起在等待队列中，表现为程序“卡住”。
+&emsp;&emsp;Zephyr的 k_mutex 是非递归的（non-recursive），且并不自动检测死锁。若使用不当，线程会永久挂起在等待队列中，表现为程序“卡住”。
 
-我们来详细展开一个使用互斥锁保护LED操作的示例，在一个多线程系统中，如果多个线程要控制同一个外设（如GPIO控制的LED），而这些操作不是原子的（比如要先设定再等待、再设定），
+&emsp;&emsp;我们来详细展开一个使用互斥锁保护LED操作的示例，在一个多线程系统中，如果多个线程要控制同一个外设（如GPIO控制的LED），而这些操作不是原子的（比如要先设定再等待、再设定），
 就会出现竞态条件（race condition），导致行为不一致甚至崩溃。比如线程 A 要点亮 LED（高电平），延迟一段时间后熄灭；线程 B 也要点亮 LED，但延迟时间不同。若两个线程并发访问 LED，没有同步机制，
 可能导致LED 刚被点亮就被另一个线程熄灭；
 
@@ -411,7 +424,190 @@ void main(void)
 }
 ```
 
-
 ### 3.消息队列```k_msgq```
 
+&emsp;&emsp;RTOS中，线程（或任务）之间通常需要交换数据，而不仅仅是同步“事件”。例如：一个传感器线程采集数据，另一个线程处理数据；一个主控线程下发指令，多个执行线程按指令动作。
+这种**需要传递“结构化数据”**的场景，信号量和互斥锁就不够用了。  
+>消息队列的核心目的：在任务之间安全、可靠、解耦地传递数据（消息）。  
 
+**消息队列机制原理**: 消息队列是一个线程安全的循环缓冲区，用于存放固定大小的“消息”。  
+
+| 特性     | 消息队列 (`k_msgq`) | 信号量 (`k_sem`) | 互斥锁 (`k_mutex`) |
+| ------ | --------------- | ------------- | --------------- |
+| 数据传递   | ✅ 支持完整消息        | ❌ 无数据，仅标志     | ❌ 仅保护访问         |
+| 异步解耦   | ✅ 典型用途          | ✅ 一定程度        | ❌ 持锁期间同步        |
+| 多线程支持  | ✅ 支持多生产者/消费者    | ✅             | ✅               |
+| ISR 支持 | 只支持 `put`（非阻塞）  | 仅 `give` 支持   | ❌ ISR 禁止使用      |
+| 用途     | 数据交换 + 通信       | 通知、控制节拍       | 保护临界资源          |
+
+消息队列的定义是
+```c
+struct k_msgq {
+	struct k_queue queue;        /* 内部使用的队列结构（用于管理等待线程） */
+	uint32_t msg_size;           /* 每个消息的大小（单位：字节） */
+	uint32_t max_msgs;           /* 最大消息数量 */
+	char *buffer_start;          /* 消息缓冲区的起始地址 */
+	char *buffer_end;            /* 消息缓冲区的结束地址（= start + msg_size * max_msgs） */
+	char *read_ptr;              /* 当前读取位置指针 */
+	char *write_ptr;             /* 当前写入位置指针 */
+	size_t used_msgs;            /* 当前消息数量 */
+	_wait_q_t wait_q;            /* 等待队列（用于挂起等待取消息的线程） */
+};
+```
+
+| 成员名                    | 类型   | 含义                     | 举例或备注                                    |
+| ---------------------- | ---- | ---------------------- | ---------------------------------------- |
+| `struct k_queue queue` | 内部结构 | 实现底层同步机制，如挂起线程、排队唤醒等   | Zephyr 的队列系统封装了 `_wait_q_t`              |
+| `uint32_t msg_size`    | 整数   | 每条消息的字节长度              | 比如：`sizeof(struct sensor_data)`          |
+| `uint32_t max_msgs`    | 整数   | 最多能容纳多少条消息             | 总容量 = `msg_size * max_msgs`              |
+| `char *buffer_start`   | 指针   | 指向消息存储区的首地址            | 内存由 `K_MSGQ_DEFINE()` 或 `msgq_init()` 提供 |
+| `char *buffer_end`     | 指针   | 指向存储区尾部地址（非含义上的“最后一条”） | 计算方式是 `start + size * count`             |
+| `char *read_ptr`       | 指针   | 下一个消息读取的位置             | 接收线程使用                                   |
+| `char *write_ptr`      | 指针   | 下一个消息写入的位置             | 发送线程使用                                   |
+| `size_t used_msgs`     | 整数   | 当前队列中有效消息数量            | 判定空满的依据                                  |
+| `_wait_q_t wait_q`     | 内核结构 | 等待消息的线程列表（阻塞的消费者）      | 每个等待线程都会排队挂起在这里                          |
+
+(1)消息队列创建  
+静态创建:  
+```c
+K_MSGQ_DEFINE(name, msg_size, max_msgs, align)
+```
+例如
+```c
+K_MSGQ_DEFINE(my_msgq, sizeof(int), 10, 4);  // 定义一个最多放10个 int（每个4字节）的队列
+```
+
+动态创建：
+```c
+struct k_msgq my_msgq;
+k_msgq_init(&my_msgq, buffer, msg_size, max_msgs);
+```
+例如
+```c
+char my_buffer[10 * sizeof(int)];
+struct k_msgq my_msgq;
+
+void main(void) {
+    k_msgq_init(&my_msgq, my_buffer, sizeof(int), 10);
+}
+```
+&emsp;&emsp;需要注意到，动态创建消息队列不仅仅是提供一个声明一个结构体然后初始化这个结构体，还需要在初始化的时候提供一个对应的缓存空间用来储存数据。  
+如果分配到的 buffer 大小与预期不一致（过小或过大），会带来不同的问题。  
+>过小：消息队列在写入或读取时可能越界，导致内存覆盖、不可预测错误，甚至系统奔溃。
+过大：不会直接导致越界，但会浪费 RAM；且如果 buffer 对齐不当，也可能潜在影响性能或触发对齐相关的运行时错误。
+
+(2)消息发送
+```c
+int k_msgq_put(struct k_msgq *q, const void *data, k_timeout_t timeout);
+```
+&emsp;&emsp;运行流程：检查队列是否已满（used_msgs == max_msgs）；  
+	若未满：拷贝 data 到 buffer[write_index]write_index++，used_msgs++  
+	若有等待线程在 get，直接唤醒一个线程并将数据交给它；  
+	若已满：若 timeout != K_NO_WAIT，当前线程被挂起，加入队列；
+	否则立即返回 -ENOMSG；
+	若在中断中，只允许使用 K_NO_WAIT（不可阻塞）版本。
+
+(3)消息接受
+```c
+int k_msgq_get(struct k_msgq *q, void *data, k_timeout_t timeout);
+```
+&emsp;&emsp;运行流程：检查队列是否为空（used_msgs == 0）；  
+	若非空：从 buffer[read_index] 拷贝数据到 data；read_index++，used_msgs--  
+	若有线程等待 put（因队列满），唤醒一个并允许其发送；  
+	若为空：若 timeout != K_NO_WAIT，当前线程被挂起；  
+	否则立即返回 -ENOMSG；  
+
+(4)应用实例
+&emsp;&emsp;生产者线程模拟周期性采集传感器数据（如温度、湿度），把数据打包成消息，投递到消息队列中。消费者线程等待消息队列有数据后，取出并“处理”该数据（这里用打印模拟处理逻辑）。
+如果消息队列满了，生产者可选择阻塞等待或直接丢弃/覆盖旧数据（本例用阻塞等待方式）。
+这样，生产者和消费者在时序上解耦：生产者每隔固定时间产生数据，无需关心消费者处理速度；消费者一有数据就处理，无需关心何时产生。
+
+首先定义消息和消息队列
+```c
+#include <zephyr/kernel.h>
+
+#define MSGQ_MAX_MSGS 5
+
+struct sensor_data {
+    uint32_t timestamp;   // 采集时刻的简单标记（可用 k_uptime_get_32()）
+    int16_t temperature;  // 温度，单位: 0.01°C（举例）
+    int16_t humidity;     // 湿度，单位: 0.01% RH（举例）
+};
+
+K_MSGQ_DEFINE(sensor_msgq,
+              sizeof(struct sensor_data),
+              MSGQ_MAX_MSGS,
+              4);
+```
+生产者线程和消费者线程
+```c
+#define PRODUCER_STACK_SIZE 512
+#define PRODUCER_PRIORITY   5
+
+void producer_thread(void *p1, void *p2, void *p3)
+{
+    ARG_UNUSED(p1); ARG_UNUSED(p2); ARG_UNUSED(p3);
+
+    struct sensor_data data;
+    uint32_t count = 0;
+
+    while (1) {
+        // 模拟采集：生成一个简单递增的“温度/湿度”值
+        data.timestamp = k_uptime_get_32();
+        data.temperature = 2000 + (count % 100);  // 示例值
+        data.humidity    = 5000 + (count % 100);  // 示例值
+
+        // 投递消息：若队列满，则阻塞等待（最多等待 500 ms）
+        int ret = k_msgq_put(&sensor_msgq, &data, K_MSEC(500));
+        if (ret == 0) {
+            printk("[Producer] Put data: time=%u, temp=%d, hum=%d\n",
+                   data.timestamp, data.temperature, data.humidity);
+        } else if (ret == -EAGAIN) {
+            // 超时未能 put：队列仍然满。可选择丢弃或其他处理
+        }
+        count++;
+        // 生产周期：每 300 ms 采集一次
+        k_sleep(K_MSEC(300));
+    }
+}
+
+// 静态定义生产者线程
+K_THREAD_DEFINE(producer_tid, PRODUCER_STACK_SIZE, producer_thread, NULL, NULL, NULL, PRODUCER_PRIORITY, 0, 0);
+
+#define CONSUMER_STACK_SIZE 512
+#define CONSUMER_PRIORITY   6
+
+void consumer_thread(void *p1, void *p2, void *p3)
+{
+    ARG_UNUSED(p1); ARG_UNUSED(p2); ARG_UNUSED(p3);
+
+    struct sensor_data recv;
+
+    while (1) {
+        // 从消息队列取消息：若队列空，则永久等待
+        int ret = k_msgq_get(&sensor_msgq, &recv, K_FOREVER);
+        if (ret == 0) {
+            // 模拟处理
+            // 模拟处理耗时
+            k_sleep(K_MSEC(150));
+        } else {
+            // 理论上 K_FOREVER 不会返回错误
+        }
+    }
+}
+
+// 静态定义消费者线程
+K_THREAD_DEFINE(consumer_tid,
+                CONSUMER_STACK_SIZE,
+                consumer_thread,
+                NULL, NULL, NULL,
+                CONSUMER_PRIORITY, 0, 0);
+```
+最终主函数
+```c
+void main(void)
+{
+   //啥都不需要，主函数也是一个线程
+}
+
+```
