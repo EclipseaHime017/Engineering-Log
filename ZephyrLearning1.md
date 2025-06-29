@@ -109,7 +109,7 @@ Zephyr架构：
 --构建Zephyr工程（封装 cmake & ninja）  
 --调用烧录工具（如 nrfjprog, openocd, pyocd）  
 
-安装顺序：Python & pip，Zephyr SDK，west 工具
+安装顺序：Python & pip，Zephyr SDK & west 工具
 
 （2）初始化项目：
 首先看官方文档安装必要项目(https://docs.zephyrproject.org/latest/develop/getting_started/index.html)  
@@ -134,7 +134,14 @@ west zephyr-export
 >
 >更新zephyr
 >
->导出 Zephyr 环境变量到 shell 中，主要作用是，设置 CMake 的路径，使你可以脱离 west build，使用 cmake 单独构建 Zephyr 项目。  
+>导出 Zephyr 环境变量到 shell 中，主要作用是，设置 CMake 的路径，使你可以脱离 west build，使用 cmake 单独构建 Zephyr 项目。
+
+```sh
+west packages pip --install
+cd ~/zephyrproject/zephyr
+west sdk install
+```
+最后安装west所需要的python依赖，以及zephyr官方提供的开发工具。  
 
 ## 二、Zephyr项目入门
 
