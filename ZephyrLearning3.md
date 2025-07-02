@@ -149,5 +149,47 @@ CPU 保存当前执行状态（上下文）
      ↓
 ISR 执行完成 → 恢复原状态 → 返回主程序
 ```
-Zephyr提供对GPIO引脚的中断支持，允许你配置某个引脚在电平或边沿变化时触发回调函数，这是处理按键、传感器、外部设备信号的常见手段。
+中断类型基本分为
+| 类型       | 示例             | 描述     |
+| -------- | -------------- | ------ |
+| **外部中断** | GPIO、按键、传感器    | 来自外设引脚 |
+| **内部中断** | 定时器溢出、DMA 完成   | 芯片内部事件 |
+| **软件中断** | 异常、系统调用（如 SVC） | 由软件触发  |
+
+Zephyr提供对GPIO引脚的中断支持，允许配置某个引脚在电平或边沿变化时触发回调函数，这是处理按键、传感器、外部设备信号的常见手段。
 在硬件层面，GPIO控制器（如STM32的EXTI、nRF的GPIOTE）将引脚状态变化映射为中断信号，由CPU响应。
+GPIO的中断实现可以基本分为以下五步。
+>配置设备树定义的 GPIO 引脚（包含中断极性）
+使用```gpio_pin_configure_dt() ```配置引脚
+设置```gpio_callback ```结构体与回调函数
+调用```gpio_add_callback() ```注册中断处理函数
+使用``` gpio_pin_interrupt_configure_dt() ```配置触发方式
+
+首先注册GPIO引脚后，在源文件里面包括
+```c
+const struct gpio_dt_spec button = GPIO_DT_SPEC_GET(BUTTON, gpios);
+```
+然后注册中断回调函数的结构体
+```c
+static struct gpio_callback button_cb_data
+```
+这个回调结构体包括了
+```c
+
+```
+此外还需要注册回调函数
+```c
+
+```
+最后如果要启用GPIO中断，那么需要配置中断触发方式
+```c
+gpio_pin_interrupt_configure_dt(&button, GPIO_INT_EDGE_TO_ACTIVE);
+```
+中断的触发方式有
+| 宏                           | 含义                |
+| --------------------------- | ----------------- |
+| `GPIO_INT_EDGE_TO_ACTIVE`   | 上升沿触发             |
+| `GPIO_INT_EDGE_TO_INACTIVE` | 下降沿               |
+| `GPIO_INT_EDGE_BOTH`        | 双边沿               |
+| `GPIO_INT_LEVEL_ACTIVE`     | 高电平触发             |
+| `GPIO_INT_LEVEL_INACTIVE`   | 低电平触发             |
