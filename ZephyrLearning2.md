@@ -109,6 +109,8 @@ K_THREAD_DEFINE(name, stack_size, entry_function,
 &emsp;&emsp;参数和k_thread_create()几乎一致，除了前两项stack_size这里与k_thread_create需要提供对应的线程栈地址不一样，K_THREAD_DEFINE只需提供一个大小即可，栈会随后被自动创建，而且其他的相关变量也会基于提供的标识符name一样被自动创建，而运行时创建需要手动创建线程栈和线程结构体。例如：
 ```c
 K_THREAD_DEFINE(led_tid, 1024, led_task, NULL, NULL, NULL, 3, 0, 0);
+
+//Debug：当delay设置为K_NO_WAIT的时候，可能出现编译错误，这是由于比较类型冲突，修改为0即可
 ```
 那么，下面这些变量会自动被创建，同时可以根据需要被调用，
 | 变量名             | 类型                     | 说明                            |
