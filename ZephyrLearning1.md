@@ -258,8 +258,8 @@ CONFIG_GPIO=y
 CONFIG_LOG=y
 CONFIG_MAIN_STACK_SIZE=1024
 ```
-就相当于你告诉 Zephyr：请启用 GPIO 驱动，启用日志子系统，主线程栈大小设为 1024 字节，最终构建系统会把这些配置项送入 Kconfig 系统中，与默认值合并，然后生成 .config 文件（供编译系统使用）。
-&emsp;&emsp; Kconfig 是 Zephyr（和 Linux 内核）用于配置内核和驱动功能的“菜单系统”。可以把它当成一个“配置选项数据库”，定义了每个功能、模块的开关、依赖和提示信息。每个模块（如 GPIO、I2C、shell、LVGL）通常都会有一个 Kconfig 文件。
+就相当于你告诉 Zephyr：请启用 GPIO 驱动，启用日志子系统，主线程栈大小设为 1024 字节，最终构建系统会把这些配置项送入 Kconfig 系统中，与默认值合并，然后生成 .config 文件（供编译系统使用）。  
+&emsp;&emsp; Kconfig 是 Zephyr（和 Linux 内核）用于配置内核和驱动功能的“菜单系统”。可以把它当成一个“配置选项数据库”，定义了每个功能、模块的开关、依赖和提示信息。每个模块（如 GPIO、I2C、shell、LVGL）通常都会有一个 Kconfig 文件。  
 &emsp;&emsp; Konfig和prj.config的关系如同
 ```ruby
 你写的 prj.conf
