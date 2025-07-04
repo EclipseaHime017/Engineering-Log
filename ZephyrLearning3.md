@@ -175,12 +175,65 @@ static struct gpio_callback button_cb_data
 ```
 这个回调结构体包括了
 ```c
-
+struct gpio_callback {
+    sys_snode_t node; //sys_snode_t	回调链表节点，Zephyr 内部用链表管理所有注册的中断回调。
+    gpio_callback_handler_t handler; //gpio_callback_handler_t	回调函数指针，在中断发生时被调用。
+    gpio_port_pins_t pin_mask; //gpio_port_pins_t，表示该回调关注哪些 GPIO 引脚（每位代表一个pin，一个32位无符号整形，对应引脚序号为1其余为0）
+};
 ```
 此外还需要注册回调函数
 ```c
-
+void (*gpio_callback_handler_t)(const struct device *port,struct gpio_callback *cb, gpio_port_pins_t pins);
 ```
+其中三个参数分别代表设备地址，回调触发的结构体，和相应GPIO的编号；注册（声明定义）回调函数以后，需要对结构体初始化，然后注册回调，这两个函数的定义分别是:  
+```c
+/**
+* @brief 初始化回调结构体
+* @param callback 指向回调结构体的指针
+* @param handler 回调函数指针
+* @param pin_mask GPIO 引脚
+*/
+static inline void gpio_init_callback(struct gpio_callback *callback, gpio_callback_handler_t handler, gpio_port_pins_t pin_mask)
+{
+    callback->handler = handler;
+    callback->pin_mask = pin_mask;
+}
+/**
+* @brief 注册回调进驱动链表
+* @param port GPIO 控制器设备
+* @param callback 指向回调结构体的指针
+* @note 第一部是获取GPIO驱动实现的```gpio_driver_api```接口结构体,第二步时返回结构体的成员（见后文）
+*/
+int gpio_add_callback(const struct device *port, struct gpio_callback *callback)
+{
+    const struct gpio_driver_api *api = (const struct gpio_driver_api *)port->api;
+    return api->manage_callback(port, callback, true);  // true = add
+}
+```
+(Optional)在STM32中，
+```c
+static int gpio_stm32_manage_callback(const struct device *port,
+                                      struct gpio_callback *callback,
+                                      bool set)
+{
+    struct gpio_stm32_data *data = port->data;
+    return gpio_manage_callback(&data->cb, callback, set);
+}
+
+int gpio_manage_callback(sys_slist_t *callbacks,
+                         struct gpio_callback *callback,
+                         bool set)
+{
+    if (set) {
+        sys_slist_append(callbacks, &callback->node);
+    } else {
+        sys_slist_find_and_remove(callbacks, &callback->node);
+    }
+    return 0;
+}
+```
+从而实现注册。(Optional end)
+
 最后如果要启用GPIO中断，那么需要配置中断触发方式
 ```c
 gpio_pin_interrupt_configure_dt(&button, GPIO_INT_EDGE_TO_ACTIVE);
@@ -193,3 +246,116 @@ gpio_pin_interrupt_configure_dt(&button, GPIO_INT_EDGE_TO_ACTIVE);
 | `GPIO_INT_EDGE_BOTH`        | 双边沿               |
 | `GPIO_INT_LEVEL_ACTIVE`     | 高电平触发             |
 | `GPIO_INT_LEVEL_INACTIVE`   | 低电平触发             |
+
+用一个按键控制GPIO的例子来实际操作一下。
+>按下按键，LED点亮；松开按键，LED熄灭。
+~~显然这样的任务用中断来实现又有了点脱裤子排矢气的感觉了，不过无所谓了哈哈哈哈~~
+
+首先梳理一下思路，为了实现这样的功能，需要注册两个GPIO分别表示LED和按键，请参考开发板引脚原理图。
+随后，需要在代码中创建回调结构体和回调函数并进行初始化和注册。最后主函数while循环内进行循环延时即可（为了保证while不占用过多资源）。
+```c
+#include <zephyr/kernel.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/device.h>
+#include <zephyr/devicetree.h>
+
+#define BUTTON_NODE DT_NODELABEL(user_button)
+#define LED_NODE DT_NODELABEL(led0)
+
+static const struct gpio_dt_spec button = GPIO_DT_SPEC_GET(BUTTON_NODE, gpios);
+static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED_NODE, gpios);
+static struct gpio_callback button_cb_data;
+
+void button_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
+{
+    if (pins & BIT(button.pin)) {
+        printk("Button interrupt triggered\n");
+        // Toggle the LED state
+        gpio_pin_toggle_dt(&led);
+    }
+}
+
+void main(void)
+{
+    gpio_pin_configure_dt(&button, GPIO_INPUT | GPIO_PULL_UP);
+    gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE);
+
+    gpio_pin_interrupt_configure_dt(&button, GPIO_INT_EDGE_BOTH);
+
+    gpio_init_callback(&button_cb_data, button_handler, BIT(button.pin));
+    gpio_add_callback(button.port, &button_cb_data);
+
+    printk("GPIO interrupt configured.\n");
+
+    while (1) {
+        k_msleep(1000);
+    }
+}
+```
+其次稍微对先前的内容进行一个复习，创建CMakeLists.txt和prj.conf
+```cmake
+cmake_minimum_required(VERSION 3.20.0)
+find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+project(EXTI)
+
+target_sources(app PRIVATE src/main.c)
+```
+```Kconfig
+CONFIG_GPIO=y
+
+# 启用 UART 控制台
+CONFIG_UART_CONSOLE=y
+
+# 启用控制台支持
+CONFIG_CONSOLE=y
+```
+最后编译烧录即可，详细代码可以参考仓库里适用于robomaster C板的案例（暂未更新）
+
+## Appendix for Learning 3
+
+### 注册回调驱动链表
+本质上它是 Zephyr 中为了支持多个 PIO引脚共享一个中断源、多个中断用户共享同一控制器而设计的一种事件调度机制，
+是Zephyr实现驱动层中断分发的标准方式。
+Zephyr驱动中，维护一个callback链表每当中断触发时，遍历链表，每个回调检查是否命中当前中断pin命中就调用你注册的回调函数。
+>把GPIO控制器比作一个“报警器”，每个gpio_callback是一个“监听器”挂在上面，  
+报警器响了，就去遍历所有监听器，看看谁订阅了当前的报警来源。
+
+Zephyr的GPIO驱动支持同一个GPIO控制器或引脚绑定多个gpio_callback回调结构体，每个GPIO控制器驱动内部维护了一个链表：
+```c
+struct gpio_driver_data {
+    ...
+    sys_slist_t callbacks;  // 🔗 链表结构，存放多个gpio_callback
+};
+```
+以 Zephyr 的 GPIO 驱动为例，中断触发后，执行类似如下流程：
+```c
+void gpio_isr(const struct device *dev)
+{
+    uint32_t triggered_pins = read_pending_pins(dev); //读取当前触发的的pin掩码
+
+    SYS_SLIST_FOR_EACH_NODE(&data->callbacks, node) {
+        struct gpio_callback *cb = CONTAINER_OF(node, struct gpio_callback, node);
+
+        if (triggered_pins & cb->pin_mask) {
+            cb->handler(dev, cb, triggered_pins);  //调用匹配的回调函数
+        }
+    }
+}
+//注册回调，就是往这个链表里append()一个节点。
+```
+Zephyr使用的是单向链表sys_slist_t，调用sys_slist_append()来添加新的回调节点。所以第一个注册的回调最先执行后注册的回调会在链表尾部，排在后面执行。
+
+对比STM32 HAL库开发
+HAL库实现中断回调函数
+```c
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin);
+```
+这种方式灵活性差,用户需手动管理每个引脚的响应逻辑且无法动态注册/注销回调。
+| 比较项    | Zephyr RTOS                | STM32 HAL                      |
+| ------ | -------------------------- | ------------------------------ |
+| 中断分发   | 驱动中维护 callback 链表          | 编译时写死在 `EXTIxx_IRQHandler`     |
+| 用户逻辑注册 | `gpio_add_callback()` 动态添加 | 手动写 `HAL_GPIO_EXTI_Callback()` |
+| 支持多个回调 | ✅ 支持多个 callback            | ❌ 通常只能写一个函数                    |
+| 多用户支持  | ✅ 每个 pin 可单独绑定             | ❌ 需要用户手动区分 pin                 |
+| 动态绑定   | ✅ 运行时绑定 ISR                | ❌ 靠编译时固定分配                     |
+
