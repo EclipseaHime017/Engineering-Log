@@ -6,11 +6,11 @@
 
 ## 一、ZephyrRTOS中的GPIO
 
-GPIO（General Purpose Input/Output）用于控制芯片上的引脚的电平状态，高/低电平对应 1/0。
+&emsp;&emsp; GPIO（General Purpose Input/Output）用于控制芯片上的引脚的电平状态，高/低电平对应 1/0。
 Zephyr把GPIO抽象成设备对象，用统一的API进行管理，并通过设备树进行硬件配置绑定。
 
 ### 1. 设备树配置  
-开始GPIO的部分前一个需要澄清的概念是设备树（devicetree)，Zephyr 中的 设备树（Device Tree） 是整个系统硬件抽象和驱动自动化配置的核心机制。
+&emsp;&emsp; 开始GPIO的部分前一个需要澄清的概念是设备树（devicetree)，Zephyr 中的 设备树（Device Tree） 是整个系统硬件抽象和驱动自动化配置的核心机制。
 它允许你在不写死驱动代码的情况下，声明并管理硬件资源（如 GPIO、UART、I2C、SPI、LED、按键等），使应用层代码更加通用、可移植。
 
 | 功能      | 说明                                     |
@@ -67,7 +67,7 @@ struct gpio_dt_spec {
 ```
 
 ### 2. GPIO输出
-在Learning II里面有提到，ZephyrRTOS操作GPIO和HAL是类似的，首先需要配置一个GPIO引脚为输出、输入、上拉、下拉、中断等模式。
+&emsp;&emsp; 在Learning II里面有提到，ZephyrRTOS操作GPIO和HAL是类似的，首先需要配置一个GPIO引脚为输出、输入、上拉、下拉、中断等模式。
 ```c
 int gpio_pin_configure_dt(const struct gpio_dt_spec *spec, gpio_flags_t flags);
 ```
@@ -101,7 +101,7 @@ bool gpio_is_ready_dt(const struct gpio_dt_spec *spec); //用于判断设备是�
 ```
 
 ### 3. GPIO输入
-GPIO 输入模式用于读取引脚上的电平状态，常见应用包括：按键检测、读取外部设备的 READY 状态、接收数字传感器输出、响应外部中断信号。
+&emsp;&emsp; GPIO 输入模式用于读取引脚上的电平状态，常见应用包括：按键检测、读取外部设备的 READY 状态、接收数字传感器输出、响应外部中断信号。
 在设备树定义中，GPIO_ACTIVE_LOW表示逻辑“按下”为低电平（即物理低电平被解释为逻辑1），基本配置和输出一样，
 随后初始化引脚为输入
 ```c
@@ -137,7 +137,7 @@ void main(void)
 ```
 
 ## 二、 GPIO中断
-中断（Interrupt）是CPU 在运行主程序时被外部或内部事件打断，转去处理这些事件的一种机制。
+&emsp;&emsp; 中断（Interrupt）是CPU 在运行主程序时被外部或内部事件打断，转去处理这些事件的一种机制。
 ```txt
 正常运行 → 事件发生 → 触发中断请求（IRQ）
      ↓
@@ -156,7 +156,7 @@ ISR 执行完成 → 恢复原状态 → 返回主程序
 | **内部中断** | 定时器溢出、DMA 完成   | 芯片内部事件 |
 | **软件中断** | 异常、系统调用（如 SVC） | 由软件触发  |
 
-Zephyr提供对GPIO引脚的中断支持，允许配置某个引脚在电平或边沿变化时触发回调函数，这是处理按键、传感器、外部设备信号的常见手段。
+&emsp;&emsp; Zephyr提供对GPIO引脚的中断支持，允许配置某个引脚在电平或边沿变化时触发回调函数，这是处理按键、传感器、外部设备信号的常见手段。
 在硬件层面，GPIO控制器（如STM32的EXTI、nRF的GPIOTE）将引脚状态变化映射为中断信号，由CPU响应。
 GPIO的中断实现可以基本分为以下五步。
 >配置设备树定义的 GPIO 引脚（包含中断极性）
@@ -165,7 +165,7 @@ GPIO的中断实现可以基本分为以下五步。
 调用```gpio_add_callback() ```注册中断处理函数
 使用``` gpio_pin_interrupt_configure_dt() ```配置触发方式
 
-首先注册GPIO引脚后，在源文件里面包括
+&emsp;&emsp; 首先注册GPIO引脚后，在源文件里面包括
 ```c
 const struct gpio_dt_spec button = GPIO_DT_SPEC_GET(BUTTON, gpios);
 ```
@@ -234,7 +234,7 @@ int gpio_manage_callback(sys_slist_t *callbacks,
 ```
 从而实现注册。(Optional end)
 
-最后如果要启用GPIO中断，那么需要配置中断触发方式
+&emsp;&emsp; 最后如果要启用GPIO中断，那么需要配置中断触发方式
 ```c
 gpio_pin_interrupt_configure_dt(&button, GPIO_INT_EDGE_TO_ACTIVE);
 ```
@@ -251,7 +251,7 @@ gpio_pin_interrupt_configure_dt(&button, GPIO_INT_EDGE_TO_ACTIVE);
 >按下按键，LED点亮；松开按键，LED熄灭。
 ~~显然这样的任务用中断来实现又有了点脱裤子排矢气的感觉了，不过无所谓了哈哈哈哈~~
 
-首先梳理一下思路，为了实现这样的功能，需要注册两个GPIO分别表示LED和按键，请参考开发板引脚原理图。
+&emsp;&emsp; 首先梳理一下思路，为了实现这样的功能，需要注册两个GPIO分别表示LED和按键，请参考开发板引脚原理图。
 随后，需要在代码中创建回调结构体和回调函数并进行初始化和注册。最后主函数while循环内进行循环延时即可（为了保证while不占用过多资源）。
 ```c
 #include <zephyr/kernel.h>
@@ -314,13 +314,13 @@ CONFIG_CONSOLE=y
 ## Appendix for Learning 3
 
 ### 注册回调驱动链表
-本质上它是 Zephyr 中为了支持多个 PIO引脚共享一个中断源、多个中断用户共享同一控制器而设计的一种事件调度机制，
-是Zephyr实现驱动层中断分发的标准方式。
-Zephyr驱动中，维护一个callback链表每当中断触发时，遍历链表，每个回调检查是否命中当前中断pin命中就调用你注册的回调函数。
+&emsp;&emsp; 本质上它是 Zephyr 中为了支持多个 PIO引脚共享一个中断源、多个中断用户共享同一控制器而设计的一种事件调度机制，
+是Zephyr实现驱动层中断分发的标准方式。  
+&emsp;&emsp; Zephyr驱动中，维护一个callback链表每当中断触发时，遍历链表，每个回调检查是否命中当前中断pin命中就调用你注册的回调函数。
 >把GPIO控制器比作一个“报警器”，每个gpio_callback是一个“监听器”挂在上面，  
 报警器响了，就去遍历所有监听器，看看谁订阅了当前的报警来源。
 
-Zephyr的GPIO驱动支持同一个GPIO控制器或引脚绑定多个gpio_callback回调结构体，每个GPIO控制器驱动内部维护了一个链表：
+&emsp;&emsp; Zephyr的GPIO驱动支持同一个GPIO控制器或引脚绑定多个gpio_callback回调结构体，每个GPIO控制器驱动内部维护了一个链表：
 ```c
 struct gpio_driver_data {
     ...
@@ -345,8 +345,7 @@ void gpio_isr(const struct device *dev)
 ```
 Zephyr使用的是单向链表sys_slist_t，调用sys_slist_append()来添加新的回调节点。所以第一个注册的回调最先执行后注册的回调会在链表尾部，排在后面执行。
 
-对比STM32 HAL库开发
-HAL库实现中断回调函数
+&emsp;&emsp; 对比STM32 HAL库开发，HAL库实现中断回调函数：
 ```c
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin);
 ```
