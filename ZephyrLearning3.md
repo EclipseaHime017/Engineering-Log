@@ -2,7 +2,8 @@
 
 **作者：EclipseaHime017**  
 **环境：Ubuntu22.04**  
-**设备：DJI Robomaster Development Board A STM32F427IIH6**  
+**设备：DJI Robomaster Development Board A STM32F427IIH6** or **DJI Robomaster Development Board C STM32F407IGT6**
+
 
 ## 一、ZephyrRTOS中的GPIO
 
