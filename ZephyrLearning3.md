@@ -279,7 +279,7 @@ void button_handler(const struct device *dev, struct gpio_callback *cb, uint32_t
 void main(void)
 {
     gpio_pin_configure_dt(&button, GPIO_INPUT | GPIO_PULL_UP);
-    gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE);
+    gpio_pin_configure_dt(&led, GPIO_OUTPUT_INACTIVE);
 
     gpio_pin_interrupt_configure_dt(&button, GPIO_INT_EDGE_BOTH);
 
