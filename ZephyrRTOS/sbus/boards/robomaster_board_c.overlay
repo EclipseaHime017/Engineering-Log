@@ -1,0 +1,6 @@
+/ {
+    sbus0: sbus0 {
+        compatible = "ares,sbus";
+        status = "okay";
+    };
+};
