@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>C/C++ Tutorial 演示PPT</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Prism for C syntax highlighting -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs/themes/prism-tomorrow.css">
+  <script src="https://cdn.jsdelivr.net/npm/prismjs/prism.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs/components/prism-clike.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs/components/prism-c.min.js"></script>
+  <style>
+    /* Typography: ensure consistency across same semantic levels */
+    :root{
+      --title-font: 'Segoe UI', Arial, sans-serif;
+      --title-size: 3.2rem;      /* main title */
+      --section-size: 2.2rem;    /* section titles and h2 */
+      --point-size: 1.18rem;     /* keypoint items */
+      --code-size: 1.12rem;      /* code font-size */
+      --card-radius: 28px;
+    }
+    body { margin:0; font-family: var(--title-font); background: linear-gradient(120deg,#eef3ff 0%,#fbfdff 100%); color:#123; overflow:hidden; }
+    .slide { display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%) scale(0.995); width:90vw; max-width:1100px; min-width:340px; min-height:70vh; max-height:90vh; background:rgba(255,255,255,0.98); box-shadow:0 18px 48px rgba(20,60,110,0.08); border-radius:var(--card-radius); padding:48px 56px 40px 56px; box-sizing:border-box; transition:opacity .45s cubic-bezier(.2,.9,.3,1), transform .45s; opacity:0; z-index:1; overflow-y:auto; }
+    .slide.active{ display:block; opacity:1; transform:translate(-50%,-50%) scale(1); z-index:2; }
+    .slide.title-only{ display:flex; align-items:center; justify-content:center; }
+    /* Title / section / points */
+    h1{ margin:0; color:#184b78; font-weight:800; font-size:var(--title-size); text-align:center; }
+    h2{ margin:0 0 6px 0; color:#184b78; font-weight:800; font-size:var(--section-size); }
+    .section-title{ font-size:var(--section-size); color:#184b78; font-weight:800; text-align:center; }
+    .keypoints{ margin-top:20px; display:flex; flex-direction:column; gap:12px; padding-left:12px; }
+    .keypoints li{ list-style:none; font-size:var(--point-size); line-height:1.7; color:#1f4f7a; padding-left:18px; position:relative; }
+    .keypoints li:before{ content:'•'; position:absolute; left:-12px; color:#6ea0d8; font-size:1.4rem; }
+    /* Code block (large, no wrapping, scrollable) */
+    pre[class*="language-"]{ border-radius:14px; padding:20px; font-size:var(--code-size); line-height:1.6; min-height:280px; max-height:560px; overflow:auto; box-shadow:0 8px 22px rgba(20,60,110,0.06); white-space:pre; }
+    code{ font-family:'Fira Mono','Consolas',monospace; }
+    /* Progress */
+    .progress-wrap{ position:fixed; bottom:22px; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:12px; z-index:20; }
+    .progress{ width:360px; height:10px; background:#eaf3ff; border-radius:10px; overflow:hidden; }
+    .progress-bar{ height:100%; background:linear-gradient(90deg,#1e66b1 0%,#6ea8da 100%); width:0%; transition:width .4s; border-radius:10px; }
+    #progressPct{ min-width:56px; color:#184b78; font-weight:800; text-align:left; }
+    /* responsive */
+    @media (max-width:900px){ :root{--title-size:2.6rem; --section-size:1.8rem; --point-size:1.08rem;} .progress{width:260px;} }
+    @media (max-width:600px){ :root{--title-size:2.0rem; --section-size:1.4rem; --point-size:1rem;} .slide{padding:20px;} pre[class*="language-"]{min-height:180px;} .progress{width:160px;} }
+  </style>
+</head>
+<body>
+  <!-- Page 0: Title only -->
+  <div class="slide active title-only" data-kind="home">
+    <h1>C / C++ Tutorial</h1>
+  </div>
+
+  <!-- Section 1 -->
+  <div class="slide title-only" data-kind="section-start">
+    <div class="section-title">Structure of C</div>
+  </div>
+  <div class="slide">
+    <h2>Structure of a C program</h2>
+    <ul class="keypoints">
+      <li>预处理（<code>#include</code>、<code>#define</code>）：文本替换与头文件展开</li>
+      <li>编译单元（.c + .h）：声明与实现分离，头文件防护</li>
+      <li>函数与全局/局部作用域；链接（external/internal）与可见性</li>
+      <li>主函数 <code>main()</code> 为程序入口；返回值与约定</li>
+    </ul>
+    <pre class="language-c"><code class="language-c">#include &lt;stdio.h&gt;
+// 声明
+int add(int a, int b);
+
+int main(void) {
+  int result = add(3, 4);
+  printf("Result: %d\n", result);
+  return 0;
+}
+
+// 实现
+int add(int a, int b) { return a + b; }
+</code></pre>
+  </div>
+
+  <!-- Section 2 -->
+  <div class="slide title-only" data-kind="section-start">
+    <div class="section-title">Fundamental Concepts</div>
+  </div>
+  <div class="slide">
+    <h2>Codes, Compiler, Toolchain</h2>
+    <ul class="keypoints">
+      <li>源文件（.c/.h/.cpp），良好风格与模块化提高可维护性</li>
+      <li>编译流程：预处理 → 编译（警告/优化）→ 汇编 → 链接</li>
+      <li>常用选项：<code>-Wall -Wextra -O2 -g</code>；了解优化与调试差别</li>
+      <li>构建系统（Make/CMake）与包管理，IDE 提升开发效率</li>
+    </ul>
+  </div>
+
+  <!-- Section 3 -->
+  <div class="slide title-only" data-kind="section-start">
+    <div class="section-title">Variables</div>
+  </div>
+  <div class="slide">
+    <h2>Integers, Floats, Characters</h2>
+    <ul class="keypoints">
+      <li>整型（<code>int/short/long</code>）与符号（signed/unsigned）与范围</li>
+      <li>浮点（<code>float/double</code>）与精度、舍入误差</li>
+      <li>字符与编码（ASCII/UTF-8），注意多字节字符串处理</li>
+      <li>变量生命周期：自动/静态/动态分配与作用域</li>
+    </ul>
+  </div>
+
+  <!-- Section 4 -->
+  <div class="slide title-only" data-kind="section-start">
+    <div class="section-title">Complex Variables</div>
+  </div>
+  <div class="slide">
+    <h2>Struct, Enum, Union</h2>
+    <ul class="keypoints">
+      <li><code>struct</code>：聚合不同类型字段，使用 <code>typedef</code> 提高可读性</li>
+      <li><code>enum</code>：有名整型常量，便于状态/分支处理</li>
+      <li><code>union</code>：节省内存但需管理有效成员，注意对齐与类型惩罚（aliasing）</li>
+      <li>内存布局：对齐、填充与 sizeof 的实际含义</li>
+    </ul>
+    <pre class="language-c"><code class="language-c">typedef struct {
+  int id;
+  char name[20];
+} Student;
+
+enum Week { MON, TUE, WED, THU, FRI, SAT, SUN };
+
+union Data { int i; float f; char c; };
+</code></pre>
+  </div>
+
+  <!-- Section 5 -->
+  <div class="slide title-only" data-kind="section-start">
+    <div class="section-title">Array & Pointer</div>
+  </div>
+  <div class="slide">
+    <h2>Arrays and Pointers</h2>
+    <ul class="keypoints">
+      <li>数组名指向首元素（decay 为指针），但数组与指针类型不同</li>
+      <li>指针算术：步进以目标类型大小为单位</li>
+      <li>动态分配（<code>malloc/free</code>）与内存泄漏防护</li>
+      <li>常见错误：越界、悬空指针、未初始化指针</li>
+    </ul>
+    <pre class="language-c"><code class="language-c">#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+
+int main(void) {
+  int *p = malloc(3 * sizeof(int));
+  if (!p) return 1;
+  p[0]=10; p[1]=20; p[2]=30;
+  for (int i=0;i&lt;3;i++) printf("p[%d]=%d\n", i, p[i]);
+  free(p);
+  return 0;
+}
+</code></pre>
+  </div>
+
+  <!-- Section 6 -->
+  <div class="slide title-only" data-kind="section-start">
+    <div class="section-title">Logic Flow</div>
+  </div>
+  <div class="slide">
+    <h2>IF, For, While, Switch</h2>
+    <ul class="keypoints">
+      <li><code>if/else</code>：条件判断与短路逻辑</li>
+      <li><code>for/while/do-while</code>：选择合适循环并注意边界条件</li>
+      <li><code>switch</code>：用于离散值的多分支，注意 <code>break</code></li>
+      <li>控制语句：<code>break</code>/<code>continue</code>/<code>goto</code> 的语义与替代</li>
+    </ul>
+  </div>
+
+  <!-- Section 7 -->
+  <div class="slide title-only" data-kind="section-start">
+    <div class="section-title">Function & Function Pointer</div>
+  </div>
+  <div class="slide">
+    <h2>Functions and Function Pointers</h2>
+    <ul class="keypoints">
+      <li>函数声明与定义（原型）——类型匹配与链接</li>
+      <li>参数传递：值传递与指针传递的差别</li>
+      <li>函数指针用于回调与策略模式，示例用于事件处理</li>
+      <li>特殊函数：<code>static</code>（内部链接）、<code>inline</code>、可变参数函数</li>
+    </ul>
+    <pre class="language-c"><code class="language-c">#include &lt;stdio.h&gt;
+int add(int a,int b){return a+b;}
+void operate(int x,int y,int (*f)(int,int)){printf("%d\n", f(x,y));}
+int main(void){operate(4,5,add);return 0;}
+</code></pre>
+  </div>
+
+  <!-- Section 8 -->
+  <div class="slide title-only" data-kind="section-start">
+    <div class="section-title">Class (C++ 简介)</div>
+  </div>
+  <div class="slide">
+    <h2>Class (if using C++)</h2>
+    <ul class="keypoints">
+      <li>类封装数据与方法：构造/析构函数保证资源管理（RAII）</li>
+      <li>封装、继承、多态（虚函数）是面向对象核心</li>
+      <li>注意 C 与 C++ 的链接与ABI：用 <code>extern "C"</code> 互操作</li>
+      <li>推荐：在需要对象语义时使用 C++，C 保持简单性与可移植性</li>
+    </ul>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+    <div id="progressPct">0%</div>
+  </div>
+
+  <script>
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    let current = 0;
+    const sectionsCount = Math.ceil((slides.length - 1) / 2);
+
+    function updateProgress(idx){
+      if(idx===0){ setProgress(0); return; }
+      const sectionIndex = Math.floor((idx-1)/2);
+      const pct = Math.round(((sectionIndex+1)/sectionsCount)*100);
+      setProgress(pct);
+    }
+    function setProgress(pct){ document.getElementById('progressBar').style.width = pct+'%'; document.getElementById('progressPct').textContent = pct+'%'; }
+    function showSlide(idx, animate=true){ if(idx<0||idx>=slides.length) return; current=idx; slides.forEach((s,i)=>s.classList.toggle('active', i===idx)); updateProgress(idx); if(window.Prism) Prism.highlightAll(); }
+    document.addEventListener('keydown', e=>{ if(e.key==='ArrowLeft'&&current>0) showSlide(current-1); if(e.key==='ArrowRight'&&current<slides.length-1) showSlide(current+1); });
+    let startX=null; document.addEventListener('touchstart', e=>{ if(e.touches.length===1) startX=e.touches[0].clientX; });
+    document.addEventListener('touchend', e=>{ if(startX===null) return; const dx=e.changedTouches[0].clientX-startX; startX=null; if(dx>60&&current>0) showSlide(current-1); if(dx<-60&&current<slides.length-1) showSlide(current+1); });
+    let mDown=false,mStart=null; document.addEventListener('mousedown', e=>{ mDown=true; mStart=e.clientX; });
+    document.addEventListener('mouseup', e=>{ if(!mDown||mStart===null){ mDown=false; mStart=null; return;} const dx=e.clientX-mStart; mDown=false; mStart=null; if(dx>60&&current>0) showSlide(current-1); if(dx<-60&&current<slides.length-1) showSlide(current+1); });
+    showSlide(0,false);
+  </script>
+</body>
+</html>
