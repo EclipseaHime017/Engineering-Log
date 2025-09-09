@@ -143,6 +143,8 @@ west sdk install
 ```
 最后安装west所需要的python依赖，以及zephyr官方提供的开发工具。  
 
+在完成zephyr的安装后，为了保证后面程序的烧录能够正常进行，如果使用STLINK需要在ST官网下载STM32CubeProgrammer，并在终端创建一个udev规则来解锁USB权限，具体操作参考互联网和AI。
+
 ## 二、Zephyr项目入门
 
 ### 1.Zephyr工程示例
