@@ -28,7 +28,7 @@ class Simulator:
             self.width = 2.0  # Width of the car
             self.color = 'blue'  # Color of the car
 
-            self.process_noise_std = 0.1
+            self.process_noise_std = 1
 
         def control(self, t: float):
             if t < 10:
@@ -55,7 +55,7 @@ class Simulator:
             self.simulator = simulator
             self.sensor_type = sensor_type
             if sensor_type == "Lidar":
-                self.measurement_noise_std = 0.1
+                self.measurement_noise_std = 10
             elif sensor_type == "Satellite":
                 self.measurement_noise_std = 1
             elif sensor_type == "Accelerometer":
@@ -92,25 +92,76 @@ class Simulator:
                 self.observer = Observer
             else:
                 raise Exception("Invalid measurement")
-
+            
+            # Model Parameters Initialization
             self.F = np.array([[1, self.dt],
-                               [0, 1]])  # State transition model
+                               [0, 1]])                         # State transition model
             self.G = np.array([[0.5 * self.dt ** 2],
-                               [self.dt]])  # Control input model
-            self.H = np.array([[1, 0]])  # Observation model
+                               [self.dt]])                      # Control input model
+            self.H = np.array([[1, 0]])                         # Observation model
 
             observation_noise_var = self.observer.measurement_noise_std ** 2
             process_noise_var = self.object.process_noise_std ** 2
-            self.Q = np.array([[process_noise_var, 0],
-                               [0, process_noise_var]])
-            self.R = np.array([[observation_noise_var]])  # Measurement noise covariance
-            self.prior_error = np.array([[0],[0]])  #   prior estimate error
-            self.posterior_error = np.array([[0],[0]])  #posterior estimate error
-            self.posterior_error_cov = np.eye(2)  # posterior estimate error covariance
-            self.x_estimate = np.array([[0],
-                                       [0]])  #  state estimate
 
-        def predict(self,u):
+            # Kalman Filter Parameters Initialization
+            self.Q = np.array([[process_noise_var, 0],
+                               [0, process_noise_var]])         # Process noise covariance
+            self.R = np.array([[observation_noise_var]])        # Measurement noise covariance
+            self.prior_error = np.array([[0],[0]])              # prior estimate error
+            self.posterior_error = np.array([[0],[0]])          # posterior estimate error
+            self.posterior_error_cov = np.eye(2)                # posterior estimate error covariance
+
+            # G-H Filter Parameters Initialization
+            self.g = 0.2                                        # Gain for position
+            self.h = 0.1                                        # Gain for velocity
+            self.k = 0.01                                       # Gain for acceleration
+            
+            # Initial Estimate
+            self.x_estimate = np.array([[0],
+                                       [0]])                    # state estimate
+            
+        def g_h_k_filter(self, x_t, v_t, u):
+            """
+            A simple g-h filter implementation for position and velocity estimation.
+            args:
+                x_t: position at time t
+                v_t: velocity at time t
+                u: control input (acceleration)
+            Remark 
+                prediction:
+                    x_t = x_(t-1) + v_(t-1)*dt + 0.5*a_(t-1)*dt^2
+                    v_t = v_(t-1) + a_(t-1)*dt
+                    a_t = u_t
+                update:
+                    x_t' = x_t + g*(z_t - x_t)
+                    v_t' = v_t + (h/dt)*(z_t - x_t)
+                    a_t' = a_t + (k/dt)*(z_t - x_t)
+                in which 
+                    z_t is the measurement at time t
+                    i_t' for i in {x,v,a} is the estimated state after update
+            Here, under the circumstance that control input u is known, we directly use u as a_t, which will be more accurate.
+            However, u comes with noise in real world and hence estimating a_t is still necessary. 
+            When u is unknown, we can estimate a_t as well.
+            """
+            dt = self.dt
+            g = self.g
+            h = self.h
+            k = self.k
+            measurement = self.observer.measure(self.object)
+            # Prediction step
+            x_t = x_t + v_t * dt + 0.5 * u * (dt ** 2)
+            v_t = v_t + u * dt
+            a_t = u
+
+            # Update step
+            residual = measurement - x_t
+            x_t = x_t + g * residual
+            v_t = v_t + (h / dt) * residual
+            a_t = a_t + (2 * k / (dt ** 2)) * residual
+
+            return x_t, v_t, a_t
+       
+        def kalman_filter(self,u):
             """
             This function predicts the next state
             
@@ -158,8 +209,18 @@ class Simulator:
 
             return x_t, P_t
         
-        def update(self, control):
-            self.x_estimate, self.posterior_error_cov = self.predict(control)
+        def update(self, control, x_t, type='Kalman Filter'):
+            if type == 'Kalman Filter':
+                x_t, P_t = self.kalman_filter(control)
+                self.x_estimate = x_t
+                self.posterior_error_cov = P_t
+            elif type == 'G-H-K Filter':
+                x_t, v_t, a_t = self.g_h_k_filter(x_t[0, 0], x_t[1, 0], control)
+                self.x_estimate = np.array([[x_t],
+                                            [v_t]])
+                # a_t is discarded here
+            else:
+                raise ValueError("Unsupported filter type")
 
     def visualize(self):
         true_positions = []
@@ -208,7 +269,7 @@ class Simulator:
             # update the state variables of the car
             acceleration = self.car.control(t)
             self.car.update(acceleration, self.dt)
-            self.estimator.update(acceleration)
+            self.estimator.update(control=acceleration, x_t=self.estimator.x_estimate, type='Kalman Filter')
             
             # update the state variables of the observer
             measured_pos = self.observer.measure(self.car)
