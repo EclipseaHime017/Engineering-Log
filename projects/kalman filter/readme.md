@@ -8,5 +8,6 @@ The observer is also provided with very simple choices with unidimensional measu
 20/10/2025  
 A new G-H-K filter function is implemented. You may switch between kalman filter and g-h-k filter in realization of function ```animate()``` to see different performances.
 
+An average filter is included for reference.
 
 There are bugs to be fixed.
