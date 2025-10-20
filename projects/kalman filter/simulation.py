@@ -209,6 +209,33 @@ class Simulator:
 
             return x_t, P_t
         
+        def average_filter(self, x_t, v_t, u):
+            """
+            Remark
+                Suggest that I believe in bot prediction and measurement since I'm a wizard.
+                prediction:
+                    x_t = x_(t-1) + v_(t-1)*dt + 0.5*a_(t-1)*dt^2
+                    v_t = v_(t-1) + a_(t-1)*dt
+                    a_t = u_t
+                update:
+                    x_t' = 0.5*(x_t + z_t)
+                    v_t' = 0.5*(v_t + (z_t - x_t)/dt)
+                    a_t' = u_t
+            """
+            dt = self.dt
+            measurement = self.observer.measure(self.object)
+            # Prediction step
+            x_t = x_t + v_t * dt + 0.5 * u * (dt ** 2)
+            v_t = v_t + u * dt
+            a_t = u
+
+            # Update step
+            x_t = 0.5 * (x_t + measurement)
+            v_t = 0.5 * (v_t + (measurement - x_t) / dt)
+            a_t = u
+
+            return x_t, v_t, a_t
+        
         def update(self, control, x_t, type='Kalman Filter'):
             if type == 'Kalman Filter':
                 x_t, P_t = self.kalman_filter(control)
@@ -219,6 +246,11 @@ class Simulator:
                 self.x_estimate = np.array([[x_t],
                                             [v_t]])
                 # a_t is discarded here
+            elif type == 'Average Filter':
+                x_t, v_t, a_t = self.average_filter(x_t[0, 0], x_t[1, 0], control)
+                self.x_estimate = np.array([[x_t],
+                                            [v_t]])
+                # a_t is also discarded here
             else:
                 raise ValueError("Unsupported filter type")
 
@@ -269,7 +301,7 @@ class Simulator:
             # update the state variables of the car
             acceleration = self.car.control(t)
             self.car.update(acceleration, self.dt)
-            self.estimator.update(control=acceleration, x_t=self.estimator.x_estimate, type='Kalman Filter')
+            self.estimator.update(control=acceleration, x_t=self.estimator.x_estimate, type='Average Filter')
             
             # update the state variables of the observer
             measured_pos = self.observer.measure(self.car)
