@@ -10,4 +10,7 @@ A new G-H-K filter function is implemented. You may switch between kalman filter
 
 An average filter is included for reference.
 
+21/10/2025
+A low-pass filter(LPF) is implemented. To emphasize, LPF may be neither a predictor nor an estimator. 
+
 There are bugs to be fixed.
