@@ -236,6 +236,27 @@ class Simulator:
 
             return x_t, v_t, a_t
         
+        def low_pass_filter(self, tau = 1):
+            '''
+            Low-pass filter is used for the estimation.
+
+            Remark
+                For a digital low-pass filter, y[n+1] = a*x[n] + (1 - a)*y[n], a = dt / tau
+                As for estimation, x_t = a*z_t + (1-a)*x_(t-1)
+
+                Low-pass filter is unlike other filters, it works as a smoother rather than a predictor-estimator.
+                You would find that the measurements processed my become smoother,
+                but it does not provide neither an accurate prediction nor estimation.
+            '''
+            try:
+                self.observer.sensor_type == "Lidar"
+            except:
+                raise ValueError("Low-pass filter is currently only applicable for position measurement (Lidar)")
+            a = self.dt / tau
+            measurement = self.observer.measure(self.object)
+            x_t = a * measurement + (1 - a) * self.x_estimate[0, 0]
+            return x_t
+        
         def update(self, control, x_t, type='Kalman Filter'):
             if type == 'Kalman Filter':
                 x_t, P_t = self.kalman_filter(control)
@@ -251,6 +272,11 @@ class Simulator:
                 self.x_estimate = np.array([[x_t],
                                             [v_t]])
                 # a_t is also discarded here
+            elif type == 'Low-Pass Filter':
+                x_t = self.low_pass_filter(tau = 0.5)
+                self.x_estimate = np.array([[x_t],
+                                            [0]])  
+                # velocity is not concerned here
             else:
                 raise ValueError("Unsupported filter type")
 
@@ -301,7 +327,7 @@ class Simulator:
             # update the state variables of the car
             acceleration = self.car.control(t)
             self.car.update(acceleration, self.dt)
-            self.estimator.update(control=acceleration, x_t=self.estimator.x_estimate, type='Average Filter')
+            self.estimator.update(control=acceleration, x_t=self.estimator.x_estimate, type='Kalman Filter')
             
             # update the state variables of the observer
             measured_pos = self.observer.measure(self.car)
