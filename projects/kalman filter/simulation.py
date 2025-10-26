@@ -60,6 +60,8 @@ class Simulator:
                 self.measurement_noise_std = 1
             elif sensor_type == "Accelerometer":
                 self.measurement_noise_std = 0.05
+            elif sensor_type == "Lidar+Satellite":
+                self.measurement_noise_std = np.array([[10], [1]])
             else:
                 raise ValueError("Unsupported sensor type")
 
@@ -77,6 +79,10 @@ class Simulator:
                 return car.velocity + noise
             elif self.sensor_type == "Accelerometer":
                 return car.acceleration + noise
+            elif self.sensor_type == "Lidar+Satellite":
+                noise = np.random.normal(0, self.measurement_noise_std, size=(2,1))
+                return np.array([[car.position],
+                                 [car.velocity]]) + noise
             else:
                 raise Exception("Invalid measurement")
             
@@ -98,7 +104,15 @@ class Simulator:
                                [0, 1]])                         # State transition model
             self.G = np.array([[0.5 * self.dt ** 2],
                                [self.dt]])                      # Control input model
-            self.H = np.array([[1, 0]])                         # Observation model
+            if self.observer.sensor_type == "Lidar+Satellite":
+                self.H = np.array([[1, 0],
+                                   [0, 1]])                      # Observation model
+            elif self.observer.sensor_type == "Lidar":
+                self.H = np.array([[1, 0]])                      # Observation model
+            elif self.observer.sensor_type == "Satellite":
+                self.H = np.array([[0, 1]])                      # Observation model
+            else:
+                raise ValueError("Unsupported sensor type for Estimator")
 
             observation_noise_var = self.observer.measurement_noise_std ** 2
             process_noise_var = self.object.process_noise_std ** 2
@@ -119,8 +133,8 @@ class Simulator:
             # Initial Estimate
             self.x_estimate = np.array([[0],
                                        [0]])                    # state estimate
-            
-        def g_h_k_filter(self, x_t, v_t, u):
+
+        def g_h_k_filter(self, u):
             """
             A simple g-h filter implementation for position and velocity estimation.
             args:
@@ -148,6 +162,8 @@ class Simulator:
             h = self.h
             k = self.k
             measurement = self.observer.measure(self.object)
+            x_t = self.x_estimate[0, 0]
+            v_t = self.x_estimate[1, 0]
             # Prediction step
             x_t = x_t + v_t * dt + 0.5 * u * (dt ** 2)
             v_t = v_t + u * dt
@@ -161,7 +177,7 @@ class Simulator:
 
             return x_t, v_t, a_t
        
-        def kalman_filter(self,u):
+        def kalman_filter(self, u):
             """
             This function predicts the next state
             
@@ -194,22 +210,42 @@ class Simulator:
                 e_t' = F * e_(t-1) + w_t
                 P_t' = F * P_(t-1) * F^T + Q
             """
-            state = np.array([[self.object.position],
-                              [self.object.velocity]])
-            x_t_pred = self.F @ state + self.G * u
+            if self.observer.sensor_type == "Lidar":
+                state = self.x_estimate
+                x_t_pred = self.F @ state + self.G * u
 
-            # update prior error covariance matrix based on previous posterior error covariance matrix
-            P_t_prior = self.F @ self.posterior_error_cov @ self.F.T + self.Q
-            # compute Kalman gain
-            K = P_t_prior @ self.H.T @ np.linalg.inv(self.H @ P_t_prior @ self.H.T + self.R)
-            # update posterior error covariance matrix
-            P_t = P_t_prior - K @ self.H @ P_t_prior
-            # compute current state estimate
-            x_t = x_t_pred + K @ (self.observer.measure(self.object) - self.H @ x_t_pred)
+                # update prior error covariance matrix based on previous posterior error covariance matrix
+                P_t_prior = self.F @ self.posterior_error_cov @ self.F.T + self.Q
+                # compute Kalman gain
+                K = P_t_prior @ self.H.T @ np.linalg.inv(self.H @ P_t_prior @ self.H.T + self.R)
+                # update posterior error covariance matrix
+                P_t = P_t_prior - K @ self.H @ P_t_prior
+                # compute current state estimate
+                x_t = x_t_pred + K @ (self.observer.measure(self.object) - self.H @ x_t_pred)
 
-            return x_t, P_t
-        
-        def average_filter(self, x_t, v_t, u):
+                return x_t, P_t
+            
+            elif self.observer.sensor_type == "Lidar+Satellite":
+                state = np.array([[self.object.position],
+                                  [self.object.velocity]])
+                x_t_pred = self.F @ state + self.G * u
+
+                # update prior error covariance matrix based on previous posterior error covariance matrix
+                P_t_prior = self.F @ self.posterior_error_cov @ self.F.T + self.Q
+                # compute Kalman gain
+                H_combined = np.array([[1, 0],
+                                       [0, 1]])
+                R_combined = np.diag(self.observer.measurement_noise_std.flatten() ** 2)
+                K = P_t_prior @ H_combined.T @ np.linalg.inv(H_combined @ P_t_prior @ H_combined.T + R_combined)
+                # update posterior error covariance matrix
+                P_t = P_t_prior - K @ H_combined @ P_t_prior
+                # compute current state estimate
+                measurement = self.observer.measure(self.object)
+                x_t = x_t_pred + K @ (measurement - H_combined @ x_t_pred)
+
+                return x_t, P_t
+            
+        def average_filter(self, u):
             """
             Remark
                 Suggest that I believe in bot prediction and measurement since I'm a wizard.
@@ -224,6 +260,8 @@ class Simulator:
             """
             dt = self.dt
             measurement = self.observer.measure(self.object)
+            x_t = self.x_estimate[0, 0]
+            v_t = self.x_estimate[1, 0]
             # Prediction step
             x_t = x_t + v_t * dt + 0.5 * u * (dt ** 2)
             v_t = v_t + u * dt
@@ -257,18 +295,18 @@ class Simulator:
             x_t = a * measurement + (1 - a) * self.x_estimate[0, 0]
             return x_t
         
-        def update(self, control, x_t, type='Kalman Filter'):
+        def update(self, control, type='Kalman Filter'):
             if type == 'Kalman Filter':
                 x_t, P_t = self.kalman_filter(control)
                 self.x_estimate = x_t
                 self.posterior_error_cov = P_t
             elif type == 'G-H-K Filter':
-                x_t, v_t, a_t = self.g_h_k_filter(x_t[0, 0], x_t[1, 0], control)
+                x_t, v_t, a_t = self.g_h_k_filter(control)
                 self.x_estimate = np.array([[x_t],
                                             [v_t]])
                 # a_t is discarded here
             elif type == 'Average Filter':
-                x_t, v_t, a_t = self.average_filter(x_t[0, 0], x_t[1, 0], control)
+                x_t, v_t, a_t = self.average_filter(control)
                 self.x_estimate = np.array([[x_t],
                                             [v_t]])
                 # a_t is also discarded here
@@ -327,7 +365,7 @@ class Simulator:
             # update the state variables of the car
             acceleration = self.car.control(t)
             self.car.update(acceleration, self.dt)
-            self.estimator.update(control=acceleration, x_t=self.estimator.x_estimate, type='Kalman Filter')
+            self.estimator.update(control=acceleration, type='Kalman Filter')
             
             # update the state variables of the observer
             measured_pos = self.observer.measure(self.car)
